@@ -1,0 +1,28 @@
+language: c
+
+sudo: false
+
+env:
+  global:
+    - LUAROCKS=2.2.2
+  matrix:
+    - LUA=lua5.1
+    - LUA=lua5.2
+    - LUA=lua5.3
+    - LUA=luajit     # latest stable version (2.0.3)
+    - LUA=luajit2.1  # current head of 2.1 branch
+
+branches:
+  only:
+    - master
+
+before_install:
+  - source .travis/setenv_lua.sh
+  - luarocks install busted luacov luacov-coveralls
+
+script:
+  - busted -c
+
+after_success:
+  - luacov-coveralls -v
+

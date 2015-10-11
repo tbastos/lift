@@ -1,0 +1,26 @@
+#!/usr/bin/env lua
+
+--collectgarbage('stop') -- disable GC by default
+
+local cli = require 'lift.cli'
+local config = require 'lift.config'
+local diagnostics = require 'lift.diagnostics'
+
+-- enable colors by default on supported terminals
+local color = require('lift.color')
+color.set_enabled(os.getenv('TERM') or os.getenv('ANSICON'))
+
+local app = cli.new()
+function app:run()
+  -- TODO
+  self:consume('command')
+end
+
+app:flag 'color'
+  :desc('--color[=off]', 'Toggle colorized output')
+  :action(function(option, value) color.set_enabled(value) end)
+
+os.exit(diagnostics.wrap(function()
+  config:init()
+  app:process(arg)
+end))
