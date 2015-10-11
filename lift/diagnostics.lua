@@ -12,6 +12,7 @@ local stderr = io.stderr
 local str_find = string.find
 local tostring = tostring
 local type = type
+local unpack = table.unpack
 
 local dbg_upvalue, dbg_traceback = debug.getupvalue, debug.traceback
 
@@ -303,7 +304,7 @@ local function wrap(f)
     end
     if diag.kind == 'cli_error' and diag.command then
       -- print help if the error was a CLI usage error
-      stderr:write(table.unpack(diag.command:get_help()))
+      stderr:write(unpack(diag.command:get_help()))
       stderr:write('\n')
     end
   end

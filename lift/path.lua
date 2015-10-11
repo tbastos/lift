@@ -5,7 +5,7 @@
 local assert, tostring, type = assert, tostring, type
 local str_match, str_gmatch = string.match, string.gmatch
 local str_sub, str_find, str_gsub = string.sub, string.find, string.gsub
-local tbl_concat, unpack = table.concat, unpack
+local tbl_concat, unpack = table.concat, table.unpack
 local from_glob = require('lift.string').from_glob
 local config = require 'lift.config'
 

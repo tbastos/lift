@@ -2,6 +2,8 @@
 -- Simple, composable Command-Line Interfaces with command hierarchies
 -------------------------------------------------------------------------------
 
+local unpack = table.unpack
+
 local config = require 'lift.config'
 local diagnostics = require 'lift.diagnostics'
 local to_bool = require('lift.string').to_bool
@@ -59,7 +61,7 @@ function Command:__call(args) self.args = args ; return self:run() end
 
 -- the default action for all commands is to print help and exit
 local function help(cmd)
-  io.stdout:write(table.unpack(cmd:get_help()))
+  io.stdout:write(unpack(cmd:get_help()))
   os.exit(true)
 end
 function Command:action(f) self.run = f ; return self end
