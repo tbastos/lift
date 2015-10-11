@@ -23,5 +23,4 @@ script:
   - busted -c
 
 after_success:
-  - luacov-coveralls -v -i lift
-
+  - luacov-coveralls -v -i './lift/'
