@@ -18,7 +18,9 @@ branches:
 
 before_install:
   - source .travis/setenv_lua.sh
-  - luarocks install busted luacov luacov-coveralls
+  - luarocks install busted
+  - luarocks install luacov
+  - luarocks install luacov-coveralls
 
 script:
   - busted -c
