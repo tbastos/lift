@@ -12,7 +12,7 @@ local stderr = io.stderr
 local str_find = string.find
 local tostring = tostring
 local type = type
-local unpack = table.unpack
+local unpack = table.unpack or unpack -- Lua 5.1 compatibility
 
 local dbg_upvalue, dbg_traceback = debug.getupvalue, debug.traceback
 

@@ -15,15 +15,10 @@ local env_vars = {app_id = 'lift'} -- helper table to get env vars
 local root = setmetatable({}, {__index = env_vars}) -- immutable root scope
 local config = {} -- the global lift.config scope
 
--- built-in constants
-root.LIFT_VERSION = '0.1.0'
-root.LIFT_SRC_DIR = '' -- set below
-root.PATH_SEPARATOR = package.config:sub(1, 1)
-root.IS_WINDOWS = (root.PATH_SEPARATOR == '\\')
-root.EXE_NAME = (arg and arg[0]) or '?'
-root._G = _G
-
-assert(type(root.EXE_NAME == 'string'))
+-- solve mutual dependency with lift.path
+package.loaded['lift.config'] = config
+local path = require 'lift.path'
+local diagnostics = require 'lift.diagnostics'
 
 -- enable access to env vars through root
 setmetatable(env_vars, {__index = function(t, k)
@@ -71,42 +66,6 @@ setmetatable(config, configMT)
 -- Reverts lift.config to its initial state.
 function root.reset()
   config:set_parent(root:new_scope())
-end
-
--------------------------------------------------------------------------------
--- Initialization
--------------------------------------------------------------------------------
-
--- avoid recursions while loading modules
-package.loaded['lift.config'] = config
-local path = require 'lift.path'
-local diagnostics = require 'lift.diagnostics'
-
--- absolute path to the dir containing Lift's source files
-root.LIFT_SRC_DIR = path.abs(path.dir(debug.getinfo(1, "S").source:sub(2)))
-
-local function load_config(from_dir, filename)
-  filename = path.abs(from_dir..'/'..(filename or config.config_file_name))
-  if not path.is_file(filename) then return false end
-  config:load(filename)
-  return true
-end
-
--- Loads all available config files based on the current ${load_path}.
--- Each file may read and overwrite variables set by previously-loaded files.
--- The first loaded file is "${LIFT_SRC_DIR}/init/config.lua" (hardcoded).
--- Files are then loaded in the reverse order of entry in ${load_path}.
--- This usually means that global configs are loaded next, then user
--- configs, then local filesystem configs (from root down to the CWD).
-function root.init()
-  diagnostics.trace('Loading configuration files', function()
-    assert(load_config(config.LIFT_SRC_DIR, 'init/config.lua'),
-      "couldn't load Lift's built-in configuration file")
-    local paths = config.load_path
-    for i = #paths - 1, 1, -1 do
-      load_config(paths[i])
-    end
-  end)
 end
 
 -------------------------------------------------------------------------------
@@ -182,10 +141,49 @@ end
 function root:load(filename)
   self.self = self
   local f, err = loadfile(path.from_slash(filename), 't', self)
-  if not f then
+  if f then
+    if setfenv then setfenv(f, self) end -- Lua 5.1 compatibility
+    f()
+  else
     local trace = debug.traceback(nil, 2)
     diagnostics.new{'lua_error: ${1}', err, traceback = trace}:report()
   end
-  f()
 end
+
+-------------------------------------------------------------------------------
+-- Initialization
+-------------------------------------------------------------------------------
+
+local function load_config(from_dir, filename)
+  filename = path.abs(from_dir..'/'..(filename or config.config_file_name))
+  if not path.is_file(filename) then return false end
+  config:load(filename)
+  return true
+end
+
+-- Loads all available config files based on the current ${load_path}.
+-- Each file may read and overwrite variables set by previously-loaded files.
+-- The first loaded file is "${LIFT_SRC_DIR}/init/config.lua" (hardcoded).
+-- Files are then loaded in the reverse order of entry in ${load_path}.
+-- This usually means that global configs are loaded next, then user
+-- configs, then local filesystem configs (from root down to the CWD).
+function root.init()
+  diagnostics.trace('Loading configuration files', function()
+    assert(load_config(config.LIFT_SRC_DIR, 'init/config.lua'),
+      "couldn't load Lift's built-in configuration file")
+    local paths = config.load_path
+    for i = #paths - 1, 1, -1 do
+      load_config(paths[i])
+    end
+  end)
+end
+
+-- built-in constants
+root._G = _G
+root.LIFT_VERSION = '0.1.0'
+root.LIFT_SRC_DIR = path.abs(path.dir(debug.getinfo(1, "S").source:sub(2)))
+root.PATH_SEPARATOR = package.config:sub(1, 1)
+root.IS_WINDOWS = (root.PATH_SEPARATOR == '\\')
+root.EXE_NAME = (arg and arg[0]) or '?'
+assert(type(root.EXE_NAME == 'string'))
 

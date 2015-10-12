@@ -3,13 +3,13 @@
 -------------------------------------------------------------------------------
 
 local type = type
-local load = load
 local assert = assert
 local tostring = tostring
 local setmetatable = setmetatable
 local ssub = string.sub
 local sfind = string.find
 local tconcat = table.concat
+local loadstring = loadstring or load -- Lua 5.1 compatibility
 
 local path = require 'lift.path'
 
@@ -108,11 +108,13 @@ local env = setmetatable({
 })
 
 -- given a string, return a template function f(writer, context, indent)
+local setfenv = setfenv -- Lua 5.1 compatibility
 local function compile(str, name)
   local source = rewrite(str, name)
   if name then name = '@'..name end
-  local f, err = load(source, name, 't', env)
+  local f, err = loadstring(source, name, 't', env)
   if err then error(err, 0) end
+  if setfenv then setfenv(f, env) end
   return f
 end
 

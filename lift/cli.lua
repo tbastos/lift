@@ -2,7 +2,7 @@
 -- Simple, composable Command-Line Interfaces with command hierarchies
 -------------------------------------------------------------------------------
 
-local unpack = table.unpack
+local unpack = table.unpack or unpack -- Lua 5.1 compatibility
 
 local config = require 'lift.config'
 local diagnostics = require 'lift.diagnostics'

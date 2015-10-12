@@ -5,14 +5,20 @@
 local assert, tostring, type = assert, tostring, type
 local str_match, str_gmatch = string.match, string.gmatch
 local str_sub, str_find, str_gsub = string.sub, string.find, string.gsub
-local tbl_concat, unpack = table.concat, table.unpack
+local tbl_concat = table.concat
+local unpack = table.unpack or unpack -- Lua 5.1 compatibility
+local loadstring = loadstring or load -- Lua 5.1 compatibility
 local from_glob = require('lift.string').from_glob
-local config = require 'lift.config'
+
+-- bypass mutual dependency with lift.config
+local config
 
 -- OS-specific constants
-local SEPARATOR = config.PATH_SEPARATOR
-local IS_WINDOWS = config.IS_WINDOWS
+local DIR_SEP = assert(package.config:sub(1, 1))
+local IS_WINDOWS = (DIR_SEP == '\\')
 local LIST_SEPS = (IS_WINDOWS and ';' or ';:')
+local LIST_ELEM_PATT = '([^'..LIST_SEPS..']+)['..LIST_SEPS..']*'
+local LIST_SEPS_PATT = '['..LIST_SEPS..']+'
 
 -------------------------------------------------------------------------------
 -- OS abstraction functions (on top of LFS)
@@ -20,12 +26,12 @@ local LIST_SEPS = (IS_WINDOWS and ';' or ';:')
 
 -- Converts each system-specific path separator to '/'.
 local function to_slash(path)
-  return SEPARATOR == '/' and path or path:gsub(SEPARATOR , '/')
+  return DIR_SEP == '/' and path or path:gsub(DIR_SEP , '/')
 end
 
 -- Converts each '/' to the system-specific path separator.
 local function from_slash(path)
-  return SEPARATOR == '/' and path or path:gsub('/' , SEPARATOR)
+  return DIR_SEP == '/' and path or path:gsub('/' , DIR_SEP)
 end
 
 local lfs = require 'lfs'
@@ -151,7 +157,6 @@ end
 
 -- Splits a list of paths joined by OS-specific separators (such as used
 -- in the PATH environment variable). Returns an iterator, NOT a table.
-local LIST_ELEM_PATT = '([^'..LIST_SEPS..']+)['..LIST_SEPS..']*'
 local function split_list(path, t)
   return str_gmatch(path, LIST_ELEM_PATT)
 end
@@ -232,7 +237,7 @@ local function globber_factory(n)
       i..'] = '..(i > 1 and 'v' or 'abs(v, nil, true)')..'\n'
   end
   t[#t + 1] = 'v = concat(t) until stat(v) return v end'
-  return assert(load(tbl_concat(t), '=globber_factory('..n..')'))
+  return assert(loadstring(tbl_concat(t), '=globber_factory('..n..')'))
 end
 
 local cache = {}
@@ -251,7 +256,6 @@ end
 -- Returns a list with the names of all files matching the glob pattern.
 -- Supports hierarchical names such as '/usr/*/bin/lua*'. The pattern
 -- can be absolute or relative, yet returned names are always absolute.
-local LIST_SEPS_PATT = '['..LIST_SEPS..']+'
 local function glob(pattern, env, enable_debug)
   local match_var, match_patt_elem = '%${([^}]+)}', '([^/]*[*?[][^/]*)'
   local t, n, i, lstr = {}, 0, 1 -- template list, #t, position in pattern
@@ -311,7 +315,7 @@ local function glob(pattern, env, enable_debug)
 end
 
 -------------------------------------------------------------------------------
--- Module Table
+-- Initialization
 -------------------------------------------------------------------------------
 
 local M = {
@@ -331,11 +335,14 @@ local M = {
   make = make,
   match = match,
   rel = rel,
-  separator = SEPARATOR,
   split = split,
   split_list = split_list,
   to_slash = to_slash,
   volume_name = volume_name,
 }
 
-return M
+package.loaded['lift.path'] = M
+
+-- solve mutual dependency with lift.config
+config = require 'lift.config'
+
