@@ -47,4 +47,4 @@ while true do
 end
 add_path(user_dir) -- user-specific files
 add_path(global_dir) -- system-wide files
-_G.assert(add_path(LIFT_SRC_DIR..'/init'), "couldn't find Lift's built-in files")
+_G.assert(add_path(LIFT_SRC_DIR..'/init'), "missing Lift's built-in files")

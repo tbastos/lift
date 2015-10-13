@@ -36,7 +36,7 @@ local rewriteTag = {
   ['{#'] = function(s) return nil end,
 }
 
-local function rewriteLines(c, ns, str, s, e)
+local function rewrite_lines(c, ns, str, s, e)
   local before, after = ssub(str, s - 2, s), ssub(str, e, e + 2)
   if before == '%}\\' or before == '#}\\' then s = s + 2 end
   if after == '\n{%' or after == '\n{#' then e = e - 1 end
@@ -70,7 +70,7 @@ local function rewrite(str, name)
     if te then
       local x, y = sfind(str, te, e + 2, true)
       if x then
-        if j < s then ns = rewriteLines(c, ns, str, j, s - 1) end
+        if j < s then ns = rewrite_lines(c, ns, str, j, s - 1) end
         c[#c + 1] = rewriteTag[ts](ssub(str, e + 2, x - 1), ns)
         j = y + 1; i = j
       else
@@ -81,7 +81,7 @@ local function rewrite(str, name)
       i = s + 1
     end
   end
-  rewriteLines(c, ns, str, j, #str)
+  rewrite_lines(c, ns, str, j, #str)
   return tconcat(c)
 end
 
@@ -89,9 +89,9 @@ end
 -- Compile a template string into a Lua function
 -------------------------------------------------------------------------------
 
-local function toStr(x)
+local function to_str(x)
   if x == nil then return '' end
-  if type(x) == 'function' then return toStr(x()) end
+  if type(x) == 'function' then return to_str(x()) end
   return tostring(x)
 end
 
@@ -99,7 +99,7 @@ local env = setmetatable({
   _ctx = '',      -- changed at the start of every template function call
   _env = {},      -- set via set_env()
   _load = '',     -- constant, set to function 'load' below
-  _tostr = toStr, -- constant
+  _tostr = to_str, -- constant
 }, {
   __index = function(t, k) return t._ctx[k] or t._env[k] end,
   __newindex = function(t, k, v)
@@ -113,37 +113,37 @@ local function compile(str, name)
   local source = rewrite(str, name)
   if name then name = '@'..name end
   local f, err = loadstring(source, name, 't', env)
-  if err then error(err, 0) end
+  if err then error(err) end
   if setfenv then setfenv(f, env) end
   return f
 end
 
-local function setEnv(newEnv)
-  env._env = newEnv
+local function set_env(new_env)
+  env._env = new_env
 end
 
 -------------------------------------------------------------------------------
 -- Loading and caching of template files
 -------------------------------------------------------------------------------
 
-local cache = {} -- [absolute_filename: function]
+local cache = {} -- {abs_filename = function}
 
--- resolves a relative filename using the current absFile or the Coral path
-local function resolve(relPath, absFile)
-  if path.is_abs(relPath) then return relPath end
-  if absFile then -- if absFile is given we never search the Coral path
-    return path.clean(path.dir(absFile) .. '/' .. relPath)
+-- resolve filename relative to abs_name or search ${load_path}
+local function resolve(rel_name, abs_name)
+  if path.is_abs(rel_name) then return rel_name end
+  if abs_name then -- if abs_name is given we never search ${load_path}
+    return path.clean(path.dir(abs_name) .. '/' .. rel_name)
   end
-  local filename = path.findFile(relPath)
+  local filename = path.glob('${load_path}/'..rel_name)()
   if not filename then
-    error("cannot find template '"..relPath.."' in the Coral path", 3)
+    error("cannot find template '"..rel_name.."'", 3)
   end
   return filename
 end
 
--- Loads a function from a template file. If 'from' is given, it should be
--- an absolute filename relative to which 'name' should be resolved.
--- Otherwise, we search for 'name' in the Coral path.
+-- Loads a function from a template file. If 'from' is given it should be
+-- an absolute filename relative to which 'name' is resolved.
+-- Otherwise search for 'name' in ${load_path}.
 local function load(name, from)
   name = resolve(name, from)
   local cached = cache[name]
@@ -166,7 +166,7 @@ local M = {
   load = load,
   cache = cache,
   compile = compile,
-  setEnv = setEnv,
+  set_env = set_env,
 }
 
 return M

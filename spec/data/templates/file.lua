@@ -1,0 +1,3 @@
+pi = {{ math.pi }}
+{* Use templates to pretty print an acyclic table *}
+{( 'table.lua' << {t = {a = 1, b = true, c = {d = 'e'}}} )}
