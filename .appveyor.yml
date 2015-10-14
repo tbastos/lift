@@ -68,12 +68,10 @@ build_script:
 before_test:
   # install test only deps (if not already installed)
   - luarocks install busted
-  - luarocks install luacov
-  - luarocks install luacov-coveralls
 
 test_script:
   - echo "Testing..."
-  - busted -c
+  - busted
 
 after_test:
-  - luacov-coveralls -v
+  # - luacov-coveralls -v
