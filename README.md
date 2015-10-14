@@ -6,5 +6,5 @@ Lift is both a build automation **tool** (task runner) and a comprehensive **fra
 
 ### Prerequisites
 - Lua 5.1, 5.2 or 5.3
-- Linux, OS X, or Windows.
+- Linux, OS X or Windows.
 

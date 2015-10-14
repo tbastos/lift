@@ -26,12 +26,12 @@ local LIST_SEPS_PATT = '['..LIST_SEPS..']+'
 
 -- Converts each system-specific path separator to '/'.
 local function to_slash(path)
-  return DIR_SEP == '/' and path or path:gsub(DIR_SEP , '/')
+  return DIR_SEP == '/' and path or path:gsub(DIR_SEP, '/')
 end
 
 -- Converts each '/' to the system-specific path separator.
 local function from_slash(path)
-  return DIR_SEP == '/' and path or path:gsub('/' , DIR_SEP)
+  return DIR_SEP == '/' and path or path:gsub('/', DIR_SEP)
 end
 
 local lfs = require 'lfs'
@@ -106,7 +106,7 @@ end
 -- Returns true if the path is absolute.
 local function is_abs(path)
   return str_sub(path, 1, 1) == '/' or
-    (IS_WINDOWS and str_sub(path, 2, 1) == ':')
+    (IS_WINDOWS and str_sub(path, 2, 2) == ':')
 end
 
 -- Returns an absolute representation of path. If the path is not
@@ -182,7 +182,7 @@ end
 local function make(path)
   path = clean(path)
   local ok, err = _make(path)
-  return ok and path, err -- clean path on success, or nil + err
+  return (ok and path), err -- clean path on success, or nil + err
 end
 
 -- Returns true if path matches the glob pattern.

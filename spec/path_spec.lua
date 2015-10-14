@@ -92,7 +92,7 @@ describe('Module lift.path should offer', function()
 
   it('split_list() to iterate each path in a path list', function()
     local t = {}
-    for p in path.split_list'/one:two/;three' do t[#t + 1] = p end
+    for p in path.split_list'/one;two/;three' do t[#t + 1] = p end
     assert.same({'/one', 'two/', 'three'}, t)
   end)
 
@@ -164,9 +164,10 @@ describe('Module lift.path should offer', function()
 
   it('make() to create directory hierarchies', function()
     assert.no_error(function()
-      assert(path.make'./sub1/sub2')
-      assert(os.remove'./sub1/sub2')
-      assert(os.remove'./sub1')
+      assert(path.make'sub1/sub2')
+      local lfs = require 'lfs'
+      assert(lfs.rmdir('sub1/sub2'))
+      assert(lfs.rmdir('sub1'))
     end)
   end)
 

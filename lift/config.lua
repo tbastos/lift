@@ -170,7 +170,7 @@ end
 function root.init()
   diagnostics.trace('Loading configuration files', function()
     assert(load_config(config.LIFT_SRC_DIR, 'init/config.lua'),
-      "couldn't load Lift's built-in configuration file")
+      "missing Lift's built-in configuration file")
     local paths = config.load_path
     for i = #paths - 1, 1, -1 do
       load_config(paths[i])
@@ -181,9 +181,9 @@ end
 -- built-in constants
 root._G = _G
 root.LIFT_VERSION = '0.1.0'
-root.LIFT_SRC_DIR = path.abs(path.dir(debug.getinfo(1, "S").source:sub(2)))
-root.PATH_SEPARATOR = package.config:sub(1, 1)
-root.IS_WINDOWS = (root.PATH_SEPARATOR == '\\')
+root.LIFT_SRC_DIR = path.abs(path.dir(path.to_slash(debug.getinfo(1, "S").source:sub(2))))
+root.DIR_SEPARATOR = package.config:sub(1, 1)
+root.IS_WINDOWS = (root.DIR_SEPARATOR == '\\')
 root.EXE_NAME = (arg and arg[0]) or '?'
 assert(type(root.EXE_NAME == 'string'))
 
