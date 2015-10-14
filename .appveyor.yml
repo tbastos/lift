@@ -19,24 +19,24 @@ environment:
   - LJ_VER: 2.0.4
   - LJ_VER: 2.1
 
-matrix:
-  allow_failures:
-    - configuration: 2010
-      platform: x64
-    - configuration: 2008
-      platform: x64
-    - configuration: MinGW
-      platform: x64
+# matrix:
+#   allow_failures:
+#     - configuration: 2010
+#       platform: x64
+#     - configuration: 2008
+#       platform: x64
+#     - configuration: MinGW
+#       platform: x64
 
 # Abuse this section so we can have a matrix with different Compiler versions
 # Is there a better way? Like injecting an array in the matrix?
 configuration:
- #- 2015 # disabled until LuaRocks supports it officially
+  #- 2015 # disabled until LuaRocks supports it officially
   - 2013
   - 2012
-  - MinGW
-  - 2010 # only works for x86
-  - 2008 # only works for x86
+  # - MinGW
+  # - 2010 # only works for x86
+  # - 2008 # only works for x86
 
 platform:
   - x86
@@ -52,17 +52,18 @@ init:
 
 
 install:
-    # Make compiler command line tools available
-    - call .appveyor\set_compiler_env.bat
-    # Setup Lua development/build environment
-    - call .appveyor\install.bat
+  # Make compiler command line tools available
+  - call .appveyor\set_compiler_env.bat
+  # Setup Lua development/build environment
+  - call .appveyor\install.bat
 
 before_build:
   # @todo
   - echo "Installing external deps"
 
-# build_script:
+build_script:
   # - luarocks make rockspecs/foo-scm-0.rockspec
+  - echo "Nothing to build."
 
 before_test:
   # install test only deps (if not already installed)

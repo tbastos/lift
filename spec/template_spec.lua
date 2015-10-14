@@ -69,7 +69,7 @@ Hello {{name}}!
     assert.error_matches(function() render_file('non_existing.lua') end,
       "cannot find template 'non_existing.lua'")
     assert.error_matches(function() render_file('templates/invalid.lua') end,
-      "invalid.lua:2: syntax error")
+      "invalid.lua:2:")
   end)
 
 end)
