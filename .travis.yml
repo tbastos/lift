@@ -24,7 +24,7 @@ before_install:
   - luarocks install luacov-coveralls
 
 script:
-  - busted -c
+  - busted -c -v
 
 after_success:
   - luacov-coveralls -v
