@@ -34,6 +34,8 @@ install:
   - call .appveyor\set_compiler_env.bat
   - call .appveyor\install.bat
 
+build: off
+
 before_test:
   - luarocks install busted
 
