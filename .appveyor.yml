@@ -21,7 +21,6 @@ platform:
 
 configuration:
   - 2015
-  - 2013
 
 matrix:
   fast_finish: true
