@@ -32,12 +32,15 @@ cache:
 install:
   - call .appveyor\set_compiler_env.bat
   - call .appveyor\install.bat
-  - luarocks install busted
 
 build_script:
+  - luarocks install busted
   - busted -v
   - luarocks make rocks/lift-scm-0.rockspec
   - lift --help
+
+after_build:
+  - luarocks remove lift
 
 test: off
 
