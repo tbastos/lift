@@ -8,7 +8,7 @@ source = {
 
 description = {
   summary = "Lua task runner and CLI tool development framework.",
-  homepage = "https://lift.run/",
+  homepage = "https://lift.run",
   license = "MIT/X11",
 }
 

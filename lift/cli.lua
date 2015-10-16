@@ -62,7 +62,7 @@ function Command:__call(args) self.args = args ; return self:run() end
 -- the default action for all commands is to print help and exit
 local function help(cmd)
   io.stdout:write(unpack(cmd:get_help()))
-  os.exit(true)
+  os.exit()
 end
 function Command:action(f) self.run = f ; return self end
 Command:action(help)
@@ -189,7 +189,7 @@ end
 
 local function root_epilog()
   return "Read about a specific subcommand via: "..
-    config.EXE_NAME .. " help <command>\n"
+    config.app_id .. " help <command>\n"
 end
 
 -- if a help property is a function, it's called once to get a string
@@ -262,7 +262,7 @@ end
 function Command:get_help()
   local options, opt_width = prepare(self.options)
   local commands, cmd_width = prepare(self.commands)
-  local t = {'Usage:\n', MARGIN, config.EXE_NAME, ' '}
+  local t = {'Usage:\n', MARGIN, config.app_id, ' '}
   if self.parent and self.parent.parent then -- add path to command
     t[#t + 1] = self.parent.name ; t[#t + 1] = ' '
   end
