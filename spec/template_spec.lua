@@ -54,13 +54,22 @@ Hello {{name}}!
     template.set_env(_G)
     local s = render_file(config.LIFT_SRC_DIR..'/../spec/data/templates/row.lua',
       {k = 'pi', v = 3.14})
-    assert.equal("pi = 3.14,\n", s)
+    assert.equal("pi = 3.14", s)
   end)
 
   it('resolution of template files based on %{load_path}', function()
     config.reset()
     config.load_path = 'spec/data'
     local s = render_file('templates/file.lua', _G)
+    assert.equal(s, [[
+pi = 3.1415
+{
+  a = 1,
+  b = true,
+  c = {
+    d = 'e',
+  },
+}]])
   end)
 
   it('handling of errors in template files', function()

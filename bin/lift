@@ -20,7 +20,9 @@ app:flag 'color'
   :desc('--color[=off]', 'Toggle colorized output')
   :action(function(option, value) color.set_enabled(value) end)
 
-os.exit(diagnostics.wrap(function()
+local ok = diagnostics.wrap(function()
   config:init()
   app:process(arg)
-end))
+end)
+
+os.exit(ok and 0 or 1) -- Lua 5.1 compatibility

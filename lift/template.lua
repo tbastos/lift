@@ -150,6 +150,10 @@ local function load(name, from)
   if cached then return cached end
   local file = assert(io.open(name))
   local str = file:read'*a'
+  if str:sub(-1, -1) == '\n' then
+    -- remove the last \n from files
+    str = str:sub(1, -2)
+  end
   file:close()
   local func = compile(str, name)
   cache[name] = func
