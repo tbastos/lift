@@ -2,7 +2,7 @@
 
 [![Build status on UNIX](https://travis-ci.org/tbastos/lift.svg?branch=master)](https://travis-ci.org/tbastos/lift) [![Build status on Windows](https://ci.appveyor.com/api/projects/status/j15esm249a67d7f6?svg=true)](https://ci.appveyor.com/project/tbastos/lift) [![Coverage Status](https://coveralls.io/repos/tbastos/lift/badge.svg?branch=master)](https://coveralls.io/r/tbastos/lift?branch=master) [![License](http://img.shields.io/badge/License-MIT-brightgreen.svg)](LICENSE)
 
-Lift is both a build automation utility (**task runner**) and a **framework** for writing CLI tools in Lua. It's especially fit for writing compilers, generators, checkers, bots, and so on.
+Lift is both a build tool (**task runner**) and a **framework** for writing CLI tools in Lua. It's well suited for writing compilers, generators, checkers, bots and other kinds of tools.
 
 Lift's mission is to elevate the Lua ecosystem by promoting the development of
 top-notch tools for Lua. The name originated in the acronym _"Lua Infrastructure
@@ -34,11 +34,11 @@ Install via [LuaRocks]:
 
 ## Contributing
 
-Lift has a straightforward, well-tested and well-documented pure Lua code base. You are encouraged to contribute! Please follow the [contribution guidelines](CONTRIBUTING.md).
+Lift has a straightforward, well-tested, pure Lua code base. You are encouraged to contribute! Please follow the [contribution guidelines](CONTRIBUTING.md).
 
 ## References
 
-These projects have in some way influenced Lift's design:
+The following projects have in some way influenced Lift's design:
 
 - Command-line interface: [NPM], [Thor], [argparse]
 - Configuration: [NPM], [CMake], [Vim]
