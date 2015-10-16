@@ -19,11 +19,15 @@ branches:
 
 before_install:
   - source .travis/setenv_lua.sh
+
+before_script:
+  - luarocks install rocks/lift-scm-0.rockspec
   - luarocks install busted
   - luarocks install luacov
   - luarocks install luacov-coveralls
 
 script:
+  - lift --help
   - busted -c -v
 
 after_success:
