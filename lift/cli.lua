@@ -126,7 +126,7 @@ end
 -------------------------------------------------------------------------------
 
 diagnostics.levels.cli_error = 'fatal'
-diagnostics.styles.cli_error = {prefix = 'command-line error', fg = 'red'}
+diagnostics.styles.cli_error = {prefix = 'command-line error:', fg = 'red'}
 
 local function process_option(option, value, next_arg)
   local used_next = false

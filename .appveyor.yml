@@ -33,10 +33,8 @@ install:
   - call .appveyor\set_compiler_env.bat
   - call .appveyor\install.bat
 
-before_build:
-  - luarocks install rocks/lift-scm-0.rockspec
-
 build:
+  - luarocks make rocks/lift-scm-0.rockspec
   - lift --help
 
 before_test:
