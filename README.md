@@ -8,8 +8,8 @@ Lift is both a build tool (**task runner**) and a **framework** for writing CLI 
 
 ## Features
 
-- Tasks can be defined declaratively or written imperatively as Lua functions (best of both worlds).
-- Efficient multitasking engine with support for _asynchronous I/O_ and _process-level concurrency_.
+- Tasks can be defined declaratively or written imperatively as Lua functions.
+- Transparent multitasking based on coroutines, _asynchronous I/O_ and _process concurrency_.
 - Diagnostics engine for high-quality error reporting, tracing and testing.
 - Command-line interface and application configuration framework.
 - General-purpose [LPeg]-based parsing and AST manipulation framework.
