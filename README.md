@@ -29,7 +29,11 @@ Install via [LuaRocks]:
 
 ## Contributing
 
-Lift has a straightforward, well-tested, pure-Lua code base. You are encouraged to contribute! Please follow the [contribution guidelines](CONTRIBUTING.md).
+Lift has a straightforward, well-tested, pure-Lua code base.
+You are encouraged to contribute! :smiley: 
+
+Please follow the [contribution guidelines](CONTRIBUTING.md).
+You may also want to read the [project's philosophy](CONTRIBUTING.md#philosophy).
 
 ## References
 
