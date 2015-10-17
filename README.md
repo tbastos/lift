@@ -4,9 +4,11 @@
 
 Lift is both a build tool (**task runner**) and a **framework** for writing CLI tools in Lua. It's well suited for writing compilers, generators, checkers, and so forth.
 
+**WARNING:** PROJECT IS NOT READY YET! It will be announced soon. Interested? Leave a star! :smiley:
+
 ## Features
 
-- Tasks can be defined declaratively, or written imperatively as Lua functions (best of both worlds).
+- Tasks can be defined declaratively or written imperatively as Lua functions (best of both worlds).
 - Efficient multitasking engine with support for _asynchronous I/O_ and _process-level concurrency_.
 - Diagnostics engine for high-quality error reporting, tracing and testing.
 - Command-line interface and application configuration framework.
@@ -15,7 +17,7 @@ Lift is both a build tool (**task runner**) and a **framework** for writing CLI 
 - Modular, extensible architecture.
 
 ### Prerequisites
-- **OS:** Linux, OSX or Windows. Should work on any POSIX system.
+- **OS:** Linux, OSX or Windows (should work on any POSIX system)
 - **Lua:** 5.1, 5.2 or 5.3 (or a compatible LuaJIT)
 - **Libraries:** [LFS], [LPeg]
  
