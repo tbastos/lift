@@ -35,4 +35,16 @@ propose changes to this document in a pull request.
 
 _Under construction._
 
+## Philosophy
+
+Lift's _raison d'être_ is to promote the development of top-notch tools and
+help the Lua ecosystem to develop.
+
+Lift stands for _Lua Infrastructure For Tools_.
+And it helps your project to fly :wink:
+
+Design priorities are simplicity, conciseness and then efficiency. In line
+with Lua's philosophy we should maximize value, minimize code, and offer
+concise and precise documentation.
+
 [busted]: http://olivinelabs.com/busted
