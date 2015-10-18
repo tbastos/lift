@@ -19,17 +19,17 @@ propose changes to this document in a pull request.
 ## Pull Requests
 
 * Please follow the existing code style.
-* Include thoughtfully-worded, well-structured [busted] specs in the `./spec`
-  folder. Run `busted` and make sure all tests are passing.
-* In your PR explain the reason for the proposed change and how it is valuable.
-* After your PR is accepted, please help update any obsoleted documentation.
+* Include thoughtfully-worded, well-structured [busted] specs in the `./spec` folder.
+* Run `busted` and make sure all tests are passing.
+* In your pull request, explain the reason for the proposed change and how it is valuable.
+* After your pull request is accepted, please help update any obsoleted documentation.
 
 ## Git Commit Messages
 
-* Use the present tense ("Add feature" not "Added feature")
-* Use the imperative mood ("Move cursor to..." not "Moves cursor to...")
-* Limit the first line to 72 characters or less
-* Reference issues and pull requests liberally
+* Use the present tense ("Add feature" not "Added feature").
+* Use the imperative mood ("Move cursor to..." not "Moves cursor to...").
+* Limit the first line to 72 characters or less.
+* Reference issues and pull requests liberally.
 
 ## Debugging
 
@@ -37,14 +37,14 @@ _Under construction._
 
 ## Philosophy
 
-Lift's _raison d'être_ is to promote the development of top-notch tools and
-help the Lua ecosystem to develop.
+Lift's _raison d'être_ is to promote the development of top-notch tools in Lua,
+and thus help the Lua ecosystem to evolve.
 
 Lift stands for _Lua Infrastructure For Tools_.
-And it helps your project to fly :wink:
+And it helps your project to fly!
 
-Design priorities are simplicity, conciseness and then efficiency. In line
-with Lua's philosophy we should maximize value, minimize code, and offer
-concise and precise documentation.
+Design priorities are simplicity first, then conciseness and then efficiency.
+In line with Lua's philosophy we should offer maximal value, minimal code,
+and concise and precise documentation.
 
 [busted]: http://olivinelabs.com/busted
