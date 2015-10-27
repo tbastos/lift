@@ -1,4 +1,4 @@
-describe('Module lift.template should support', function()
+describe('Module lift.template', function()
 
   local config = require 'lift.config'
   local template = require 'lift.template'
@@ -17,14 +17,14 @@ describe('Module lift.template should support', function()
     template.cache[name] = template.compile(content, name)
   end
 
-  it('simple expressions', function()
+  it('supports simple expressions', function()
     local s = render_str([[
 Hello {{first}}, {{sub[1]}}, {{sub[2]}}, {{ third:upper() }}!]],
       { first = 'One', sub = {true, 3}, third = 'Four' })
     assert.equal('Hello One, true, 3, FOUR!', s)
   end)
 
-  it('statements', function()
+  it('supports statements', function()
     local s = render_str([[
 {% for _, name in ipairs(names) do %}
  * {{name}};
@@ -33,7 +33,7 @@ Hello {{first}}, {{sub[1]}}, {{sub[2]}}, {{ third:upper() }}!]],
     assert.equal('\n * One;\n * Two;\n * Three;', s)
   end)
 
-  it('includes', function()
+  it('supports partials', function()
     inject_file('/fake/templ.ct', [[
 Hello {{name}}!
 {% if child then %}
@@ -44,20 +44,20 @@ Hello {{name}}!
     assert.equal('Hello one!\n  Hello two!\n    Hello three!', s)
   end)
 
-  it('comments', function()
+  it('supports comments', function()
     local s = render_str([[Hel{# this is a multi-line
         comment #}lo {{name}}!]], { name = "world" })
     assert.equal('Hello world!', s)
   end)
 
-  it('loading of template files by absolute filename', function()
+  it('loads templates by absolute filename', function()
     template.set_env(_G)
     local s = render_file(config.LIFT_SRC_DIR..'/../spec/data/templates/row.lua',
       {k = 'pi', v = 3.14})
     assert.equal("pi = 3.14", s)
   end)
 
-  it('resolution of template files based on %{load_path}', function()
+  it('loads templates relative to the ${load_path}', function()
     config.reset()
     config.load_path = 'spec/data'
     local s = render_file('templates/file.lua', _G)
@@ -72,7 +72,7 @@ pi = 3.1415
 }]])
   end)
 
-  it('handling of errors in template files', function()
+  it('handles errors in template files', function()
     config.reset()
     config.load_path = 'spec/data'
     assert.error_matches(function() render_file('non_existing.lua') end,

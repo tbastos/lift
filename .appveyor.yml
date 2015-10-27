@@ -26,12 +26,12 @@ matrix:
   fast_finish: true
 
 cache:
-  - c:\lua -> .appveyor.yml
-  - c:\external -> .appveyor.yml
+  - c:\lua -> .ci\appveyor.yml
+  - c:\external -> .ci\appveyor.yml
 
 install:
-  - call .appveyor\set_compiler_env.bat
-  - call .appveyor\install.bat
+  - call .ci\set_compiler_env.bat
+  - call .ci\install.bat
 
 build_script:
   - luarocks install busted

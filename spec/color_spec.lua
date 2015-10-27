@@ -1,9 +1,9 @@
-describe('Module lift.color should', function()
+describe('Module lift.color', function()
 
   local color = require 'lift.color'
   after_each(function() color.set_enabled(false) end)
 
-  it('only encode colors when enabled', function()
+  it('only encodes colors when enabled', function()
     local code = color.encode'reset;bright;red;onblack'
     assert.equal('\27[0;1;31;40m', code)
     assert.equal(nil, color.esc'red')
@@ -13,7 +13,7 @@ describe('Module lift.color should', function()
     assert.equal(code, color.ESC'reset;bright;red;onblack')
   end)
 
-  it('return nil in ESC() when disabled', function()
+  it('returns nil in ESC() when disabled', function()
     local t = {color.esc'red;onblack'}
     t[#t + 1] = 'Red on black!'
     t[#t + 1] = color.esc'reset'
@@ -25,7 +25,7 @@ describe('Module lift.color should', function()
     assert.equal('\27[31;40mRed on black!\27[0m', table.concat(t))
   end)
 
-  it('support style tables', function()
+  it('supports style tables', function()
     local t = {fg = 'red', bg = 'black', bold = true, dim = false, y = 'x'}
     assert.equal('', color.from_style(t))
     color.set_enabled(true)

@@ -1,9 +1,10 @@
-describe('Module lift.diagnostics should', function()
+describe('Module lift.diagnostics', function()
 
   local diagnostics = require 'lift.diagnostics'
 
-  describe('have diagnostic objects with', function()
-    it('message-based constructor with variadic arguments', function()
+  describe('when creating diagnostic objects', function()
+
+    it('formats messages by interpolating variables', function()
       local d = diagnostics.new('remark: lift is awesome!', 1*3, 2*3)
       assert.equal('remark', d.kind, d.level)
       assert.equal('lift is awesome!', d.message)
@@ -16,7 +17,8 @@ describe('Module lift.diagnostics should', function()
       assert.error(function() diagnostics.new('crazy: kind') end,
         "unknown diagnostic kind 'crazy'")
     end)
-    it('lazy formatting of variadic arguments', function()
+
+    it('implements lazy formatting of messages', function()
       local three = diagnostics.new('remark: 3')
       local d = diagnostics.new('warning: ${1} + ${3} is not ${2}',
         1, '2', three)
@@ -27,14 +29,16 @@ describe('Module lift.diagnostics should', function()
       assert.equal('warning', d.level)
       assert.equal('remark', three.level, remark.level)
     end)
-    it('alternative constructor receiving a table of args', function()
+
+    it('alternatively accepts a list in the constructor', function()
       local d = diagnostics.new({'remark: ${1}${2}${3} ${4}${5}',
         1, '2', 3}, 4, 5)
       assert.equal('123 ${4}${5}', d.message) -- varargs are lost
     end)
+
   end)
 
-  it('have diagnostic consumers', function()
+  it('supports diagnostic consumers', function()
     diagnostics.set_consumer(nil)
     assert.error(function() diagnostics.new('error: oops'):report() end,
       'undefined diagnostics consumer')
@@ -47,7 +51,7 @@ describe('Module lift.diagnostics should', function()
     assert.equal(nil, last) d:report() assert.equal(d, last)
   end)
 
-  it('provide tools for error handling', function()
+  it('provides tools for error handling', function()
     -- setting a new consumer resets the error count
     local verifier = diagnostics.Verifier.set_new()
     assert.no_error(function() diagnostics.fail_if_error() end)

@@ -56,8 +56,19 @@ local function new_cmd(parent, name)
     commands = {} }, Command)
 end
 
--- called with a string list; return nil on success, string on error
-function Command:__call(args) self.args = args ; return self:run() end
+-- called when the command is parsed, along with its args
+function Command:matched(args) self.args = args end
+
+-- runs the command with error handling
+function Command:__call()
+  local err = self:run() -- returns nil on success, string on error
+  if err then self:error('${1}', err) end
+  local args = self.args
+  local used = args.used
+  if used and used < #args then
+    diagnostics.report("warning: unused argument '${1}'", args[used + 1])
+  end
+end
 
 -- the default action for all commands is to print help and exit
 local function help(cmd)
@@ -122,7 +133,7 @@ function Command:consume(...)
 end
 
 -------------------------------------------------------------------------------
--- Process command-line arguments (Command:process)
+-- Process command-line arguments (Command:parse and Command:process)
 -------------------------------------------------------------------------------
 
 diagnostics.levels.cli_error = 'fatal'
@@ -148,7 +159,8 @@ function Command:error(msg, ...)
   diagnostics.report{command = self, 'cli_error: '..msg, ...}
 end
 
-function Command:process(args)
+-- processes options, matches args to (sub)command and returns (sub)command
+function Command:parse(args)
   assert(type(args) == 'table', 'missing args')
   assert(self.parent == nil, 'not a root command')
   local opts, cmd_args, num_args, i, last = true, {}, 0, 1, #args
@@ -175,12 +187,12 @@ function Command:process(args)
     i = i + 1
   end
   cmd_args[0] = self.name
-  local err = self(cmd_args)
-  if err then self:error('${1}', err) end
-  local used = cmd_args.used
-  if used and used < #cmd_args then
-    diagnostics.report("warning: unused argument '${1}'", cmd_args[used + 1])
-  end
+  self:matched(cmd_args)
+  return self, cmd_args
+end
+
+function Command:process(args)
+  self:parse(args)() -- parse args and run matched (sub)command
 end
 
 -------------------------------------------------------------------------------
