@@ -1,6 +1,6 @@
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Directory and File Path Manipulation Routines
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
 local assert, tostring, type = assert, tostring, type
 local str_match, str_gmatch = string.match, string.gmatch
@@ -20,9 +20,9 @@ local LIST_SEPS = (IS_WINDOWS and ';' or ';:')
 local LIST_ELEM_PATT = '([^'..LIST_SEPS..']+)['..LIST_SEPS..']*'
 local LIST_SEPS_PATT = '['..LIST_SEPS..']+'
 
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- OS abstraction functions (on top of LFS)
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
 -- Converts each system-specific path separator to '/'.
 local function to_slash(path)
@@ -44,9 +44,9 @@ local function stat(path, attr)
   return __stat(from_slash(path), attr or 'mode')
 end
 
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Routines for manipulating slash-separated paths
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
 -- Returns true if path is a filesystem root.
 local function is_root(path)
@@ -191,9 +191,9 @@ local function match(path, glob)
   return str_match(path, '^'..from_glob(glob)..'$') ~= nil
 end
 
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Globbing patterns with ${var} expansion and n-fold ${list} products
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Based on dynamically-generated closure factories for efficiency.
 -- Each factory handles a pattern with a specific number of components.
 -- A component is either: a string, a list, or a glob pattern.
@@ -314,9 +314,9 @@ local function glob(pattern, env, enable_debug)
   return cache[n](_init, _stat, abs, tbl_concat, t, unpack(t))
 end
 
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Initialization
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
 local M = {
   abs = abs,

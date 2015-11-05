@@ -14,7 +14,6 @@ describe('Module lift.config', function()
 
   describe('internal root scope', function()
     it('has immutable vars', function()
-      assert.equal(config._G, _G)
       assert.error_matches(function() config.LIFT_VERSION = 1 end, 'cannot be changed')
     end)
 
@@ -87,6 +86,7 @@ describe('Module lift.config', function()
       assert.equal(nil, scope.pi)
       scope:load('spec/data/config.lua')
       assert.equal(3.14, scope.pi)
+      assert.equal(nil, config.pi)
       assert.equal('table', type(scope.path))
 
       assert.error_matches(function() scope:load'spec/data/config_syntax_err.lua' end,
@@ -98,8 +98,8 @@ describe('Module lift.config', function()
   it('offers :init() to automatically load config files', function()
     assert.Nil(config.pi)
     config.load_path = 'spec/data'
-    config.user_dir = 'spec/data/user'
-    config.global_dir = 'spec/data/global'
+    config.user_config_dir = 'spec/data/user'
+    config.system_config_dir = 'spec/data/system'
     config.init()
     assert.equal(config.app_version, config.LIFT_VERSION)
     assert.equal(3.14, config.pi)

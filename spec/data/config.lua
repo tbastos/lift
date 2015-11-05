@@ -1,4 +1,5 @@
-pi = 3.14
-path = self:get_list'PATH'
-self:insert('list', 'd')
-self:insert('list', 'A', 1)
+local scope = ...
+scope.pi = 3.14
+scope.path = scope:get_list'PATH'
+scope:insert('list', 'd')
+scope:insert('list', 'A', 1)

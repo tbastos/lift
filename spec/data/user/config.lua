@@ -1,2 +1,4 @@
-self:insert('list', 'c')
-opt1 = 'user'
+local scope = ...
+scope:insert('list', 'c')
+scope.opt1 = 'user'
+

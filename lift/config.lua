@@ -1,15 +1,15 @@
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Configuration System (global, transient, hierarchical key=value store)
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Gets vars from the command-line, config files and environment.
 
 local assert, type = assert, type
 local rawget, rawset, getmetatable = rawget, rawset, getmetatable
 local getenv, tinsert = os.getenv, table.insert
 
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- The immutable root scope (methods, constants, access to env vars)
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
 local env_vars = {app_id = 'lift'} -- helper table to get env vars
 local root = setmetatable({}, {__index = env_vars}) -- immutable root scope
@@ -53,9 +53,9 @@ function root:get_parent()
   return assert(getmetatable(self)).__index
 end
 
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- The lift.config scope (works as a proxy to its parent scope)
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
 local configMT = {__index = root:new_scope()}
 configMT.__newindex = function(t, k, v)
@@ -68,9 +68,9 @@ function root.reset()
   config:set_parent(root:new_scope())
 end
 
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- General Scope Methods
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
 -- Gets a var as a list. If the variable is a scalar it will be first converted
 -- to a list. Strings are split using path.split_list(), other values are
@@ -139,20 +139,18 @@ end
 
 -- Loads a config file into this scope.
 function root:load(filename)
-  self.self = self
-  local f, err = loadfile(path.from_slash(filename), 't', self)
+  local f, err = loadfile(path.from_slash(filename), 't')
   if f then
-    if setfenv then setfenv(f, self) end -- Lua 5.1 compatibility
-    f()
+    f(self)
   else
     local trace = debug.traceback(nil, 2)
     diagnostics.new{'lua_error: ${1}', err, traceback = trace}:report()
   end
 end
 
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Initialization
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
 local function load_config(from_dir, filename)
   filename = path.abs(from_dir..'/'..(filename or config.config_file_name))
@@ -179,7 +177,6 @@ function root.init()
 end
 
 -- built-in constants
-root._G = _G
 root.LIFT_VERSION = '0.1.0'
 root.LIFT_SRC_DIR = path.abs(path.dir(path.to_slash(debug.getinfo(1, "S").source:sub(2))))
 root.DIR_SEPARATOR = package.config:sub(1, 1)

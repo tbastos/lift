@@ -1,0 +1,3 @@
+local scope = ...
+scope.list = 'a;b'
+scope.opt1 = 'system'

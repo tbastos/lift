@@ -1,6 +1,6 @@
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Simple, composable Command-Line Interfaces with command hierarchies
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
 local unpack = table.unpack or unpack -- Lua 5.1 compatibility
 
@@ -8,9 +8,9 @@ local config = require 'lift.config'
 local diagnostics = require 'lift.diagnostics'
 local to_bool = require('lift.string').to_bool
 
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Option (an optional value specified for a command)
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
 local Option = {
   name = 'unknown', -- option name
@@ -39,9 +39,9 @@ function Option:alias(alias)
   return self.cmd:add_option(alias, self)
 end
 
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Command (has options, subcommands and an action)
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
 local Command = {
   name = '',      -- command name (the empty string is the root command)
@@ -114,9 +114,9 @@ function Command:command(name) -- defines a new subcommand
   return self:add_command(name, new_cmd(self, name))
 end
 
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Command:consume(...) to read required command arguments
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
 local function _consume(self, args, used, name, ...)
   if not name then return end
@@ -132,9 +132,9 @@ function Command:consume(...)
   return _consume(self, args, used, ...)
 end
 
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Process command-line arguments (Command:parse and Command:process)
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
 diagnostics.levels.cli_error = 'fatal'
 diagnostics.styles.cli_error = {prefix = 'command-line error:', fg = 'red'}
@@ -195,9 +195,9 @@ function Command:process(args)
   self:parse(args)() -- parse args and run matched (sub)command
 end
 
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Help System
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
 local function root_epilog()
   return "Read about a specific subcommand via: "..
@@ -297,11 +297,7 @@ function Command:get_help()
   return t
 end
 
--------------------------------------------------------------------------------
--- Module Functions
--------------------------------------------------------------------------------
-
--- default actions used by the root command
+-- help command/option actions
 local function help_option(option) return help(option.cmd) end
 local function help_command(command)
   local about, args = command.parent, command.args
@@ -314,24 +310,37 @@ local function help_command(command)
   return help(about)
 end
 
--- root command constructor
-local function new()
-  local app = new_cmd()
-    :desc '[options] [key=value] <command> [<args>]'
-    :epilog(root_epilog)
-
+local function register_help(app)
   app:command 'help' :action(help_command)
     :desc('help [command]', 'Print help for one command and exit')
 
   app:flag 'help' :alias 'h' :action(help_option)
     :desc('-h, --help', 'Print help information and exit')
+end
+
+------------------------------------------------------------------------------
+-- Configuration System
+------------------------------------------------------------------------------
+
+local function register_config(app)
+  app:command 'config'
+end
+
+------------------------------------------------------------------------------
+-- Module Table
+------------------------------------------------------------------------------
+
+-- returns a new root command
+local function new()
+  local app = new_cmd()
+    :desc '[options] [key=value] <command> [<args>]'
+    :epilog(root_epilog)
+
+  register_help(app)
+  register_config(app)
 
   return app
 end
-
--------------------------------------------------------------------------------
--- Module Table
--------------------------------------------------------------------------------
 
 local M = {
   new = new,
