@@ -35,6 +35,11 @@ local function set_dir(name, unix_var, unix_default, win_var, win_default)
   end
 end
 
+local function user_home(p)
+  local home = config.HOME
+  return home and (home..p) or p
+end
+
 set_dir('system_config_dir',
   nil, '/etc/xdg',
   'ProgramFiles', 'c:/Program Files')
@@ -44,15 +49,15 @@ set_dir('system_data_dir',
   'ProgramData', 'c:/ProgramData')
 
 set_dir('user_config_dir',
-  'XDG_CONFIG_HOME', config.HOME..'/.config',
+  'XDG_CONFIG_HOME', user_home('/.config'),
   'APPDATA', 'c:')
 
 set_dir('user_data_dir',
-  'XDG_DATA_HOME', config.HOME..'/.local/share',
+  'XDG_DATA_HOME', user_home('/.local/share'),
   'LOCALAPPDATA', 'c:')
 
 set_dir('cache_dir',
-  'XDG_CACHE_HOME', config.HOME..'/.cache',
+  'XDG_CACHE_HOME', user_home('/.cache'),
   'TEMP', 'c:/Temp')
 
 ------------------------------------------------------------------------------
