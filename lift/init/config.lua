@@ -5,12 +5,7 @@
 local config = ...
 local path = require 'lift.path'
 
--- Default app_id and app_version
-if not config.app_version then
-  config.app_version = config.LIFT_VERSION
-end
-
--- Default init_file_name
+-- Default config_file_name
 if not config.config_file_name then
   config.config_file_name = 'config.lua'
 end
@@ -28,9 +23,9 @@ end
 local function set_dir(name, unix_var, unix_default, win_var, win_default)
   if not config[name] then
     if config.IS_WINDOWS then
-      config[name] = env(win_var, win_default) ..'/'.. config.app_id
+      config[name] = env(win_var, win_default) ..'/'.. config.APP_ID
     else
-      config[name] = env(unix_var, unix_default) ..'/'.. config.app_id
+      config[name] = env(unix_var, unix_default) ..'/'.. config.APP_ID
     end
   end
 end
@@ -75,7 +70,7 @@ end
 -- project-specific files (from CWD up to FS root)
 local dir = path.cwd()
 while true do
-  add_path(dir..'/.'..config.app_id)
+  add_path(dir..'/.'..config.APP_ID)
   if #dir <= 1 or path.is_root(dir) then break end
   dir = path.dir(dir)
 end

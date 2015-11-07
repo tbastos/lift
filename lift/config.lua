@@ -1,7 +1,8 @@
 ------------------------------------------------------------------------------
 -- Configuration System (global, transient, hierarchical key=value store)
 ------------------------------------------------------------------------------
--- Gets vars from the command-line, config files and environment.
+-- Gathers vars from the command-line, config files and environment.
+-- Initial scope hierarchy: (env) <-- {root} <-- {config}
 
 local assert, type = assert, type
 local rawget, rawset, getmetatable = rawget, rawset, getmetatable
@@ -11,9 +12,9 @@ local getenv, tinsert = os.getenv, table.insert
 -- The immutable root scope (methods, constants, access to env vars)
 ------------------------------------------------------------------------------
 
-local env_vars = {app_id = 'lift'} -- helper table to get env vars
-local root = setmetatable({}, {__index = env_vars}) -- immutable root scope
-local config = {} -- the global lift.config scope
+local env_vars = {} -- helper table to get env vars
+local root = setmetatable({}, {id = 'built-in constants', __index = env_vars})
+local config = {} -- the lift.config scope (a proxy)
 
 -- solve mutual dependency with lift.path
 package.loaded['lift.config'] = config
@@ -21,15 +22,15 @@ local path = require 'lift.path'
 local diagnostics = require 'lift.diagnostics'
 
 -- enable access to env vars through root
-setmetatable(env_vars, {__index = function(t, k)
+setmetatable(env_vars, {id = 'environment variables', __index = function(t, k)
   if type(k) ~= 'string' then return end
   -- try MYAPP_VAR_NAME first, then just var_name
-  local v = getenv(config.app_id:upper().."_"..k:upper()) or getenv(k)
+  local v = getenv(config.APP_ID:upper().."_"..k:upper()) or getenv(k)
   if v then t[k] = v end
   return v
 end})
 
--- forbid child scopes from shadowing root's fields
+-- root vars are immutable; forbid child scopes from shadowing them
 local function __newindex(t, k, v)
   if rawget(root, k) then
     error("'"..k.."' is reserved for internal use and cannot be changed")
@@ -38,8 +39,9 @@ local function __newindex(t, k, v)
 end
 
 -- Creates a child scope that inherits from parent (default = root).
-function root.new_scope(parent)
-  return setmetatable({}, {__index = parent or root, __newindex = __newindex})
+function root.new_scope(parent, id)
+  return setmetatable({}, {id = id or '?',
+    __index = parent or root, __newindex = __newindex})
 end
 
 -- Changes the parent of a scope.
@@ -57,19 +59,14 @@ end
 -- The lift.config scope (works as a proxy to its parent scope)
 ------------------------------------------------------------------------------
 
-local configMT = {__index = root:new_scope()}
+local configMT = {id = 'config proxy', __index = root}
 configMT.__newindex = function(t, k, v)
   configMT.__index[k] = v -- write to config's parent
 end
 setmetatable(config, configMT)
 
--- Reverts lift.config to its initial state.
-function root.reset()
-  config:set_parent(root:new_scope())
-end
-
 ------------------------------------------------------------------------------
--- General Scope Methods
+-- Scope Methods
 ------------------------------------------------------------------------------
 
 -- Gets a var as a list. If the variable is a scalar it will be first converted
@@ -148,8 +145,34 @@ function root:load(filename)
   end
 end
 
+-- For each accessible var calls callback(key, value, scope_id, overridden).
+function root:list_vars(callback, include_overridden)
+  local vars = {} -- visited vars
+  local s = self -- current scope
+  repeat
+    local mt = getmetatable(s)
+    -- iterate scope vars in sorted order
+    local keys = {}
+    for k in pairs(s) do
+      keys[#keys+1] = k
+    end
+    table.sort(keys)
+    for i, k in ipairs(keys) do
+      local visited = vars[k]
+      if not visited then
+        vars[k] = true
+      end
+      if not visited or include_overridden then
+        callback(k, s[k], mt.id, visited)
+      end
+    end
+    -- move to parent scope
+    s = mt.__index
+  until type(s) ~= 'table'
+end
+
 ------------------------------------------------------------------------------
--- Initialization
+-- Module Methods
 ------------------------------------------------------------------------------
 
 local function load_config(from_dir, filename)
@@ -176,11 +199,30 @@ function root.init()
   end)
 end
 
--- built-in constants
-root.LIFT_VERSION = '0.1.0'
-root.LIFT_SRC_DIR = path.abs(path.dir(path.to_slash(debug.getinfo(1, "S").source:sub(2))))
-root.DIR_SEPARATOR = package.config:sub(1, 1)
-root.IS_WINDOWS = (root.DIR_SEPARATOR == '\\')
-root.EXE_NAME = (arg and arg[0]) or '?'
-assert(type(root.EXE_NAME == 'string'))
+-- Reverts lift.config to its initial state.
+-- Doesn't affect constants set through set_const().
+function root.reset()
+  config:set_parent(root:new_scope('cli'))
+end
 
+-- Allows apps to configure their own constants at startup.
+function root.set_const(key, value)
+  root[key] = value
+end
+
+------------------------------------------------------------------------------
+-- Initialization
+------------------------------------------------------------------------------
+
+-- built-in immutable vars
+config.set_const('APP_ID', 'lift')
+config.set_const('APP_VERSION', '0.1.0')
+config.set_const('LIFT_VERSION', config.APP_VERSION)
+config.set_const('LIFT_SRC_DIR', path.abs(path.dir(path.to_slash(debug.getinfo(1, "S").source:sub(2)))))
+config.set_const('DIR_SEPARATOR', package.config:sub(1, 1))
+config.set_const('IS_WINDOWS', (root.DIR_SEPARATOR == '\\'))
+config.set_const('EXE_NAME', (arg and arg[0]) or '?')
+assert(type(config.EXE_NAME == 'string'))
+
+-- finish config's initialization
+config.reset()

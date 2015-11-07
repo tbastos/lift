@@ -201,7 +201,7 @@ end
 
 local function root_epilog()
   return "Read about a specific subcommand via: "..
-    config.app_id .. " help <command>\n"
+    config.APP_ID .. " <subcommand> help\n"
 end
 
 -- if a help property is a function, it's called once to get a string
@@ -274,7 +274,7 @@ end
 function Command:get_help()
   local options, opt_width = prepare(self.options)
   local commands, cmd_width = prepare(self.commands)
-  local t = {'Usage:\n', MARGIN, config.app_id, ' '}
+  local t = {'Usage:\n', MARGIN, config.APP_ID, ' '}
   if self.parent and self.parent.parent then -- add path to command
     t[#t + 1] = self.parent.name ; t[#t + 1] = ' '
   end
@@ -322,8 +322,24 @@ end
 -- Configuration System
 ------------------------------------------------------------------------------
 
+local function config_list(command)
+  local prev_scope
+  config:list_vars(function(key, value, scope, overridden)
+    if scope ~= prev_scope then
+      io.stdout:write('\n-- from ', scope, '\n')
+      prev_scope = scope
+    end
+    io.stdout:write(tostring(key), ' = ', tostring(value), '\n')
+  end, true)
+end
+
 local function register_config(app)
-  app:command 'config'
+  local config_cmd = app:command 'config'
+    :desc(nil, 'Manage '..config.APP_ID..' configuration')
+
+  config_cmd:command('list')
+    :desc(nil, 'List all variables along with their values.')
+    :action(config_list)
 end
 
 ------------------------------------------------------------------------------

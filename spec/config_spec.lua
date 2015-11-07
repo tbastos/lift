@@ -14,7 +14,9 @@ describe('Module lift.config', function()
 
   describe('internal root scope', function()
     it('has immutable vars', function()
-      assert.error_matches(function() config.LIFT_VERSION = 1 end, 'cannot be changed')
+      config.set_const('MY_CONST', 42)
+      assert.equal(42, config.MY_CONST)
+      assert.error_matches(function() config.MY_CONST = 1 end, 'cannot be changed')
     end)
 
     it('reads env vars as a fallback', function()
@@ -101,7 +103,7 @@ describe('Module lift.config', function()
     config.user_config_dir = 'spec/data/user'
     config.system_config_dir = 'spec/data/system'
     config.init()
-    assert.equal(config.app_version, config.LIFT_VERSION)
+    assert.equal(config.APP_VERSION, config.LIFT_VERSION)
     assert.equal(3.14, config.pi)
     assert.equal('user', config.opt1)
     assert.same({'A','a','b','c','d'}, config.list)
