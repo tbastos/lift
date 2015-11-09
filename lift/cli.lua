@@ -5,7 +5,9 @@
 local unpack = table.unpack or unpack -- Lua 5.1 compatibility
 
 local config = require 'lift.config'
+local lift_str = require 'lift.string'
 local diagnostics = require 'lift.diagnostics'
+local ESC = require('lift.color').ESC
 local to_bool = require('lift.string').to_bool
 
 ------------------------------------------------------------------------------
@@ -200,8 +202,8 @@ end
 ------------------------------------------------------------------------------
 
 local function root_epilog()
-  return "Read about a specific subcommand via: "..
-    config.APP_ID .. " <subcommand> help\n"
+  return "Use '" .. config.APP_ID
+    .. " help <command>' to read about a subcommand.\n"
 end
 
 -- if a help property is a function, it's called once to get a string
@@ -275,9 +277,6 @@ function Command:get_help()
   local options, opt_width = prepare(self.options)
   local commands, cmd_width = prepare(self.commands)
   local t = {'Usage:\n', MARGIN, config.APP_ID, ' '}
-  if self.parent and self.parent.parent then -- add path to command
-    t[#t + 1] = self.parent.name ; t[#t + 1] = ' '
-  end
   local usage = expand(self, 'help_usage')
   t[#t + 1] = usage or self.name ; t[#t + 1] = '\n'
   local short = expand(self, 'help_short')
@@ -323,22 +322,29 @@ end
 ------------------------------------------------------------------------------
 
 local function config_list(command)
-  local prev_scope
+  local out, prev_scope = io.stdout, nil
   config:list_vars(function(key, value, scope, overridden)
     if scope ~= prev_scope then
-      io.stdout:write('\n-- from ', scope, '\n')
+      out:write(ESC'dim', '\n-- from ', scope, ESC'reset', '\n')
       prev_scope = scope
     end
-    io.stdout:write(tostring(key), ' = ', tostring(value), '\n')
+    if overridden then
+      out:write(ESC'dim;red', tostring(key), ESC'reset',
+        ESC'dim', ' -- overridden', ESC'reset', '\n')
+    else
+      out:write(ESC'red', tostring(key), ESC'reset',
+        ESC'green', ' = ', ESC'reset',
+        ESC'cyan', lift_str.format(value), ESC'reset', '\n')
+    end
   end, true)
 end
 
 local function register_config(app)
   local config_cmd = app:command 'config'
-    :desc(nil, 'Manage '..config.APP_ID..' configuration')
+    :desc('config', 'Configuration management subcommands')
 
   config_cmd:command('list')
-    :desc(nil, 'List all variables along with their values.')
+    :desc('config list', 'List config variables along with their values.')
     :action(config_list)
 end
 

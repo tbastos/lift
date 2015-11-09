@@ -8,6 +8,8 @@ local assert, type = assert, type
 local rawget, rawset, getmetatable = rawget, rawset, getmetatable
 local getenv, tinsert = os.getenv, table.insert
 
+local utils = require 'lift.utils'
+
 ------------------------------------------------------------------------------
 -- The immutable root scope (methods, constants, access to env vars)
 ------------------------------------------------------------------------------
@@ -145,30 +147,28 @@ function root:load(filename)
   end
 end
 
--- For each accessible var calls callback(key, value, scope_id, overridden).
+-- For each var call callback(key, value, scope_id, overridden).
+-- This includes inherited vars but excludes constants.
+-- Overridden vars are only included if `include_overridden` is true.
 function root:list_vars(callback, include_overridden)
   local vars = {} -- visited vars
   local s = self -- current scope
-  repeat
+  while true do
     local mt = getmetatable(s)
-    -- iterate scope vars in sorted order
-    local keys = {}
-    for k in pairs(s) do
-      keys[#keys+1] = k
-    end
-    table.sort(keys)
-    for i, k in ipairs(keys) do
-      local visited = vars[k]
-      if not visited then
-        vars[k] = true
-      end
-      if not visited or include_overridden then
-        callback(k, s[k], mt.id, visited)
+    if s ~= root then -- skip constants
+      for i, k in ipairs(utils.keys_sorted_by_type(s)) do
+        local visited = vars[k]
+        if not visited then
+          vars[k] = true
+        end
+        if not visited or include_overridden then
+          callback(k, s[k], mt.id, visited)
+        end
       end
     end
-    -- move to parent scope
-    s = mt.__index
-  until type(s) ~= 'table'
+    if s == env_vars then break end
+    s = mt.__index -- move to parent scope
+  end
 end
 
 ------------------------------------------------------------------------------
@@ -178,7 +178,9 @@ end
 local function load_config(from_dir, filename)
   filename = path.abs(from_dir..'/'..(filename or config.config_file_name))
   if not path.is_file(filename) then return false end
-  config:load(filename)
+  local scope = config:get_parent():new_scope(filename)
+  scope:load(filename)
+  config:set_parent(scope)
   return true
 end
 

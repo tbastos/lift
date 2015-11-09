@@ -4,9 +4,12 @@
 
 local tostring, type = tostring, type
 local str_find = string.find
+local str_format = string.format
 local str_gsub = string.gsub
 local str_sub = string.sub
 local str_upper = string.upper
+local tbl_concat = table.concat
+local keys_sorted_by_type = require('lift.utils').keys_sorted_by_type
 
 -- Returns the Capitalized form of a string
 local function capitalize(str)
@@ -99,6 +102,111 @@ local function expand_list(list, map)
 end
 
 ------------------------------------------------------------------------------
+-- String Formatting
+------------------------------------------------------------------------------
+
+-- Formats an elementary value into a string.
+local function format_value(v, tp)
+  if (tp or type(v)) == 'string' then
+    return str_format('%q', v)
+  else
+    return tostring(v)
+  end
+end
+
+-- Formats a value into a string for indexing a table.
+local function format_key(v)
+  local tp = type(v)
+  if tp == 'string' and str_find(v, '^[%a_][%w_]*$') then
+    return v, true
+  end
+  return '['..format_value(v, tp)..']'
+end
+
+-- Formats a flat list of values into a string.
+-- Returns nil if the list contains nested tables, or if the resulting
+-- string would be longer than max_len (optional).
+local function format_flat_list(t, max_len)
+  local str, sep = '', ''
+  for i = 1, #t do
+    local v = t[i]
+    local tp = type(v)
+    if tp == 'table' then return end -- not flat!
+    str = str..sep..format_value(v, tp)
+    if max_len and #str > max_len then return end -- too long
+    sep = ', '
+  end
+  return str
+end
+
+-- Formats a flat table into a string.
+-- Returns nil if `t` contains nested tables, or if the resulting
+-- string would be longer than max_width (optional).
+local function format_flat_table(t, max_len, keys)
+  keys = keys or keys_sorted_by_type(t)
+  local str, sep = '', ''
+  for i = 1, #keys do
+    local k = keys[i]
+    local v = t[k]
+    local tp = type(v)
+    if tp == 'table' then return end -- oops, not flat!
+    str = str..sep..format_key(k)..' = '..format_value(v, tp)
+    if max_len and #str > max_len then return end -- too long
+    sep = ', '
+  end
+  return str
+end
+
+-- Formats any variable into a string buffer. Handles tables and cycles.
+local function sb_format(sb, name, t, indent, max_len)
+  -- handle plain values
+  local tp = type(t)
+  if tp ~= 'table' then
+    sb[#sb+1] = format_value(t, tp)
+    return
+  end
+  -- solve cycles
+  if sb[t] then
+    sb[#sb+1] = sb[t]
+    return
+  end
+  -- handle nested tables
+  sb[t] = name
+  sb[#sb+1] = '{'
+  local keys = keys_sorted_by_type(t)
+  if #keys > 0 then
+    local ml = max_len - #indent
+    local flat = (#keys == #t and
+      format_flat_list(t, ml) or format_flat_table(t, ml, keys))
+    if flat then
+      sb[#sb+1] = flat
+    else
+      sb[#sb+1] = '\n'
+      local new_indent = indent..'  '
+      for i = 1, #keys do
+        local k = keys[i]
+        local v = t[k]
+        local fk, as_id = format_key(k)
+        sb[#sb+1] = new_indent
+        sb[#sb+1] = fk
+        sb[#sb+1] = ' = '
+        sb_format(sb, name..(as_id and '.'..fk or fk), v, new_indent, max_len)
+        sb[#sb+1] = ',\n'
+      end
+      sb[#sb+1] = indent
+    end
+  end
+  sb[#sb+1] = '}'
+end
+
+-- Formats any variable into a string. Handles tables and cycles.
+local function format(value, max_len)
+  local sb = {}
+  sb_format(sb, '@', value, '', max_len or 78)
+  return tbl_concat(sb)
+end
+
+------------------------------------------------------------------------------
 -- Module Table
 ------------------------------------------------------------------------------
 
@@ -111,6 +219,11 @@ local M = {
   escape_magic = escape_magic,
   expand = expand,
   expand_list = expand_list,
+  format = format,
+  format_flat_list = format_flat_list,
+  format_flat_table = format_flat_table,
+  format_key = format_key,
+  format_value = format_value,
   from_glob = from_glob,
   to_bool = to_bool,
 }

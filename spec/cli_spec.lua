@@ -191,7 +191,7 @@ describe('Module lift.cli', function()
   end)
 
   it('offer a help system', function()
-    assert.matches("help     Print help for one command and exit",
+    assert.matches("help .* Print help for one command and exit",
       table.concat(root:get_help()))
   end)
 
