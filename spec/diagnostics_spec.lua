@@ -51,7 +51,7 @@ describe('Module lift.diagnostics', function()
     assert.equal(nil, last) d:report() assert.equal(d, last)
   end)
 
-  it('provides tools for error handling', function()
+  it('provides tools for error handling and testing', function()
     -- setting a new consumer resets the error count
     local verifier = diagnostics.Verifier.set_new()
     assert.no_error(function() diagnostics.fail_if_error() end)
@@ -78,11 +78,26 @@ describe('Module lift.diagnostics', function()
     assert.equal('first', verifier[1].message)
     assert.equal('second', verifier[2].message)
 
+    -- shorthand version of the above checks:
+    assert.no_error(function() verifier:verify{'first', 'second'} end)
+
     -- verifier should receive all diagnostics except the 'ignored' ones
     diagnostics.report('ignored: not reported')
     assert.equal(2, #verifier)
     diagnostics.report('remark: reported')
     assert.equal(3, #verifier)
+  end)
+
+  it("provides wrap(f) to automatically report diagnostics", function()
+    local ferr = io.tmpfile()
+    diagnostics.set_stderr(ferr)
+    diagnostics.wrap(function()
+      diagnostics.report 'fatal: zomg!'
+    end)
+    diagnostics.set_stderr(io.stderr)
+    ferr:seek('set')
+    local out = ferr:read('*a')
+    assert.equal('Error: zomg!\n', out)
   end)
 
 end)

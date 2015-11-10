@@ -67,13 +67,24 @@ local function add_path(p)
   end
 end
 
--- project-specific files (from CWD up to FS root)
+-- environment vars take precedence over everything except the CLI
+if config.LOAD_PATH then
+  for i, dir in ipairs(config:get_list('LOAD_PATH', true)) do
+    add_path(dir)
+  end
+end
+
+-- project-specific files (scan from CWD up to filesystem root)
 local dir = path.cwd()
 while true do
   add_path(dir..'/.'..config.APP_ID)
   if #dir <= 1 or path.is_root(dir) then break end
   dir = path.dir(dir)
 end
+
+-- user and system-specific files
 add_path(config.user_config_dir)
 add_path(config.system_config_dir)
+
+-- built-in lift files (has the least precedence)
 assert(add_path(config.LIFT_SRC_DIR..'/init'), "missing Lift's built-in files")

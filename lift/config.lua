@@ -46,7 +46,7 @@ function root.new_scope(parent, id)
     __index = parent or root, __newindex = __newindex})
 end
 
--- Changes the parent of a scope.
+-- Sets the parent of a scope.
 function root:set_parent(new_parent)
   assert(self ~= root, "the root scope's parent cannot be changed")
   assert(getmetatable(self)).__index = new_parent
@@ -55,6 +55,11 @@ end
 -- Returns the parent of a scope.
 function root:get_parent()
   return assert(getmetatable(self)).__index
+end
+
+-- Returns the string that identifies a scope.
+function root:get_id()
+  return assert(getmetatable(self)).id
 end
 
 ------------------------------------------------------------------------------
@@ -74,7 +79,7 @@ setmetatable(config, configMT)
 -- Gets a var as a list. If the variable is a scalar it will be first converted
 -- to a list. Strings are split using path.split_list(), other values are
 -- simply wrapped in a table.
-function root:get_list(var_name)
+function root:get_list(var_name, read_only)
   local v = self[var_name] ; local tp = type(v)
   if tp == 'table' then return v end
   local t = {}
@@ -84,13 +89,15 @@ function root:get_list(var_name)
   else -- return {v}
     t[1] = v
   end
-  self[var_name] = t -- update value
+  if not read_only then
+    self[var_name] = t -- update value
+  end
   return t
 end
 
 -- Like get_list() but excludes duplicate values in the list.
-function root:get_unique_list(var_name)
-  local t = self:get_list(var_name)
+function root:get_unique_list(var_name, read_only)
+  local t = self:get_list(var_name, read_only)
   local mt = getmetatable(t)
   if not mt then
     mt = {[0] = 'unique'}
@@ -179,7 +186,9 @@ local function load_config(from_dir, filename)
   filename = path.abs(from_dir..'/'..(filename or config.config_file_name))
   if not path.is_file(filename) then return false end
   local scope = config:get_parent():new_scope(filename)
-  scope:load(filename)
+  diagnostics.trace('Loading '..filename, function()
+    scope:load(filename)
+  end)
   config:set_parent(scope)
   return true
 end
@@ -197,6 +206,18 @@ function root.init()
     local paths = config.load_path
     for i = #paths - 1, 1, -1 do
       load_config(paths[i])
+    end
+    -- prioritize the cli scope
+    local first_scope = config:get_parent()
+    local cli_scope, cli_child = first_scope, config
+    while cli_scope ~= root do
+      if cli_scope:get_id() == 'cli' then
+        cli_child:set_parent(cli_scope:get_parent())
+        cli_scope:set_parent(first_scope)
+        config:set_parent(cli_scope)
+        break
+      end
+      cli_child, cli_scope = cli_scope, cli_scope:get_parent()
     end
   end)
 end

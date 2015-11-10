@@ -8,7 +8,6 @@
 
 local clock = os.clock
 local rawget = rawget
-local stderr = io.stderr
 local str_find = string.find
 local tostring = tostring
 local type = type
@@ -19,6 +18,10 @@ local dbg_upvalue, dbg_traceback = debug.getupvalue, debug.traceback
 local str = require 'lift.string'
 local color = require 'lift.color'
 local ESC = color.ESC
+
+-- allow stderr to be redirected
+local stderr = io.stderr
+local function set_stderr(fd) stderr = fd end
 
 ------------------------------------------------------------------------------
 -- Diagnostic Levels (ignored, remark, warning, error, fatal)
@@ -65,7 +68,7 @@ local function new_source_location(file, contents, pos)
 end
 
 ------------------------------------------------------------------------------
--- Diagnostic (a specially-formatted message, arguments and decorators)
+-- Diagnostic (a specially-formatted message, plus arguments and decorators)
 ------------------------------------------------------------------------------
 
 -- decorators in the hash part, arguments in the array part
@@ -124,7 +127,11 @@ end
 
 -- we report to a diagnostic consumer and keep track of the last error
 local consumer, last_error
-local function set_consumer(c) consumer, last_error = c, nil ; return c end
+local function set_consumer(c)
+  local previous = consumer
+  consumer, last_error = c, nil
+  return previous
+end
 
 function Diagnostic:report()
   assert(consumer, 'undefined diagnostics consumer')
@@ -144,7 +151,7 @@ local function fail_if_error()
 end
 
 ------------------------------------------------------------------------------
--- Verifier (consumer that accumulates diagnostics for testing)
+-- Verifier (a consumer that accumulates diagnostics for testing)
 ------------------------------------------------------------------------------
 
 local Verifier = {}
@@ -155,7 +162,9 @@ function Verifier.new()
 end
 
 function Verifier.set_new()
-  return set_consumer(Verifier.new())
+  local verifier = Verifier.new()
+  set_consumer(verifier)
+  return verifier
 end
 
 function Verifier:__call(diagnostic)
@@ -179,7 +188,7 @@ function Verifier:verify(str_list)
 end
 
 ------------------------------------------------------------------------------
--- Reporter (consumer that prints diagnostics to stderr)
+-- Reporter (a consumer that prints diagnostics to stderr)
 ------------------------------------------------------------------------------
 
 local Reporter = {}
@@ -190,7 +199,9 @@ function Reporter.new()
 end
 
 function Reporter.set_new()
-  return set_consumer(Reporter.new())
+  local reporter = Reporter.new()
+  set_consumer(reporter)
+  return reporter
 end
 
 function Reporter:__call(diagnostic)
@@ -223,7 +234,7 @@ function Reporter:report(d)
 end
 
 ------------------------------------------------------------------------------
--- Tracing and custom pcall with better error reporting
+-- Call tracing and custom pcall() with better error reporting
 ------------------------------------------------------------------------------
 
 -- tracing is disabled by default
@@ -291,7 +302,7 @@ local function pcall(f, ...)
 end
 
 ------------------------------------------------------------------------------
--- wrap(f) does a pcall(f) and reports errors and diagnostics
+-- wrap(f) calls f and automatically reports errors and diagnostics
 ------------------------------------------------------------------------------
 
 local function wrap(f)
@@ -303,7 +314,7 @@ local function wrap(f)
       consumer(diag) -- notify fatal errors after they're caught
     end
     if diag.kind == 'cli_error' and diag.command then
-      -- print help if the error was a CLI usage error
+      -- print help if the error was a cli usage error
       stderr:write(unpack(diag.command:get_help()))
       stderr:write('\n')
     end
@@ -313,9 +324,38 @@ local function wrap(f)
     local unit = 'K'
     if mem > 1024 then mem = mem / 1024 ; unit = 'M' end
     local msg = ('time %.2fs, memory %i%s'):format(dt, mem, unit)
-    stderr:write(ESC'clear;cyan', 'Total ', msg, '\n\n' )
+    stderr:write(ESC'cyan', '\nTotal ', msg, ESC'clear', '\n' )
   end
   return ok, diag
+end
+
+------------------------------------------------------------------------------
+-- capture(f) calls f and captures stdout and diagnostics (for testing)
+------------------------------------------------------------------------------
+
+local capturing = false
+local function capture(f)
+  assert(not capturing, "diagnostics.capture() cannot be called recursively")
+  capturing = true
+
+  -- save original output stream and diagnostics consumer
+  local o_ostream, o_consumer = io.output(), consumer
+
+  -- capture output and diagnostics
+  local fout = assert(io.tmpfile())
+  io.output(fout)
+  local verifier = Verifier.set_new()
+  local ok = pcall(f)
+  fout:seek('set')
+  local output = fout:read('*a')
+
+  -- restore original output stream and diagnostics consumer
+  set_consumer(o_consumer)
+  io.output(o_ostream)
+  fout:close()
+
+  capturing = false
+  return ok, output, verifier
 end
 
 ------------------------------------------------------------------------------
@@ -323,14 +363,15 @@ end
 ------------------------------------------------------------------------------
 
 local M = {
+  capture = capture,
   fail_if_error = fail_if_error,
   is_a = is_a,
   levels = levels,
   new = new,
   pcall = pcall,
-  report = report,
-  Reporter = Reporter,
+  report = report, Reporter = Reporter,
   set_consumer = set_consumer,
+  set_stderr = set_stderr,
   set_tracing = set_tracing,
   styles = styles,
   trace = trace,

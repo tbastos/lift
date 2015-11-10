@@ -6,23 +6,16 @@ local cli = require 'lift.cli'
 local config = require 'lift.config'
 local diagnostics = require 'lift.diagnostics'
 
--- enable colors by default on supported terminals
-local color = require('lift.color')
-color.set_enabled(os.getenv('TERM') or os.getenv('ANSICON'))
-
-local app = cli.new()
+local app = cli.new_standard_app()
 function app:run()
   -- TODO
   self:consume('command')
 end
 
-app:flag 'color'
-  :desc('--color[=off]', 'Toggle colorized output')
-  :action(function(option, value) color.set_enabled(value) end)
-
 local ok = diagnostics.wrap(function()
+  local command = app:parse(arg)
   config:init()
-  app:process(arg)
+  command()
 end)
 
 os.exit(ok and 0 or 1) -- Lua 5.1 compatibility

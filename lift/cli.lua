@@ -7,8 +7,11 @@ local unpack = table.unpack or unpack -- Lua 5.1 compatibility
 local config = require 'lift.config'
 local lift_str = require 'lift.string'
 local diagnostics = require 'lift.diagnostics'
-local ESC = require('lift.color').ESC
+
 local to_bool = require('lift.string').to_bool
+
+local color = require 'lift.color'
+local ESC = color.ESC
 
 ------------------------------------------------------------------------------
 -- Option (an optional value specified for a command)
@@ -74,7 +77,7 @@ end
 
 -- the default action for all commands is to print help and exit
 local function help(cmd)
-  io.stdout:write(unpack(cmd:get_help()))
+  io.write(unpack(cmd:get_help()))
   os.exit()
 end
 function Command:action(f) self.run = f ; return self end
@@ -174,17 +177,21 @@ function Command:parse(args)
       if subcmd then self = subcmd -- use subcommand instead
       else num_args = num_args + 1 ; cmd_args[num_args] = s end
     elseif s == '--' then opts = false  -- stop processing options
-    else
-      local option = self.options[key]
-      if not option then
-        local msg = 'unknown option ${1} for command ${2}'
-        if not self.parent then msg = 'unknown option ${1}' end
-        self:error(msg, dash..key, self.name)
-      end
+    else -- option or config
       local value ; if op ~= '' then value = s:sub(e + 1) end
-      local used, err = process_option(option, value, args[i + 1])
-      if err then self:error('option ${1}: ${2}', dash..key, err)
-      elseif used then i = i + 1 end
+      if dash == '' and op ~= '' then -- config setting
+        config[key] = value
+      else -- option
+        local option = self.options[key]
+        if not option then
+          local msg = 'unknown option ${1} for command ${2}'
+          if not self.parent then msg = 'unknown option ${1}' end
+          self:error(msg, dash..key, self.name)
+        end
+        local used, err = process_option(option, value, args[i + 1])
+        if err then self:error('option ${1}: ${2}', dash..key, err)
+        elseif used then i = i + 1 end
+      end
     end
     i = i + 1
   end
@@ -193,17 +200,13 @@ function Command:parse(args)
   return self, cmd_args
 end
 
-function Command:process(args)
-  self:parse(args)() -- parse args and run matched (sub)command
-end
-
 ------------------------------------------------------------------------------
 -- Help System
 ------------------------------------------------------------------------------
 
 local function root_epilog()
   return "Use '" .. config.APP_ID
-    .. " help <command>' to read about a subcommand.\n"
+    .. " help <command>' to read about a subcommand."
 end
 
 -- if a help property is a function, it's called once to get a string
@@ -230,7 +233,7 @@ local function name_comparator(a,b) return a.name < b.name end
 local function prepare(options_or_commands)
   local t, width = {}, 0
   for _, v in pairs(options_or_commands) do
-    if not t[v] then
+    if not t[v] and not v.hidden then
       t[v] = true ; t[#t + 1] = v
       local usage = expand(v, 'help_usage')
       if usage then width = math.max(width, #usage) end
@@ -313,8 +316,8 @@ local function register_help(app)
   app:command 'help' :action(help_command)
     :desc('help [command]', 'Print help for one command and exit')
 
-  app:flag 'help' :alias 'h' :action(help_option)
-    :desc('-h, --help', 'Print help information and exit')
+  app:flag 'help' :action(help_option)
+    :desc('--help', 'Print help information and exit')
 end
 
 ------------------------------------------------------------------------------
@@ -322,19 +325,19 @@ end
 ------------------------------------------------------------------------------
 
 local function config_list(command)
-  local out, prev_scope = io.stdout, nil
+  local write, prev_scope = io.write, nil
   config:list_vars(function(key, value, scope, overridden)
     if scope ~= prev_scope then
-      out:write(ESC'dim', '\n-- from ', scope, ESC'reset', '\n')
+      write(ESC'dim', '\n-- from ', scope, ESC'clear', '\n')
       prev_scope = scope
     end
     if overridden then
-      out:write(ESC'dim;red', tostring(key), ESC'reset',
-        ESC'dim', ' -- overridden', ESC'reset', '\n')
+      write(ESC'dim;red', tostring(key), ESC'clear',
+        ESC'dim', ' (overridden)', ESC'clear', '\n')
     else
-      out:write(ESC'red', tostring(key), ESC'reset',
-        ESC'green', ' = ', ESC'reset',
-        ESC'cyan', lift_str.format(value), ESC'reset', '\n')
+      write(ESC'red', tostring(key), ESC'clear',
+        ESC'green', ' = ', ESC'clear',
+        ESC'cyan', lift_str.format(value), ESC'clear', '\n')
     end
   end, true)
 end
@@ -343,29 +346,62 @@ local function register_config(app)
   local config_cmd = app:command 'config'
     :desc('config', 'Configuration management subcommands')
 
-  config_cmd:command('list')
+  config_cmd:command('list') :action(config_list)
     :desc('config list', 'List config variables along with their values.')
-    :action(config_list)
 end
 
 ------------------------------------------------------------------------------
 -- Module Table
 ------------------------------------------------------------------------------
 
--- returns a new root command
+local function print_version()
+  io.write(config.APP_VERSION, '\n')
+  os.exit()
+end
+
+-- Returns a new root command with a minimal, UNIX-compliant CLI.
 local function new()
   local app = new_cmd()
     :desc '[options] [key=value] <command> [<args>]'
     :epilog(root_epilog)
 
   register_help(app)
+
+  app:flag 'version' :action(print_version)
+    :desc('--version', 'Print version number and exit')
+
+  return app
+end
+
+-- Returns a new root command with a more elaborate CLI that exposes many
+-- useful framework features.
+local function new_standard_app()
+  local app = new()
+
+  -- hide options --help and --version
+  app.options.help.hidden = true
+  app.options.version.hidden = true
+
+  -- add config management subcommands
   register_config(app)
+
+  -- enable colors by default on supported terminals
+  color.set_enabled(os.getenv('TERM') or os.getenv('ANSICON'))
+
+  app:flag 'color'
+    :desc('--color[=off]', 'Toggle colorized output')
+    :action(function(option, value) color.set_enabled(value) end)
+
+  app:flag 'trace'
+    :desc('--trace', 'Turn on debug tracing')
+    :action(function(option, value) diagnostics.set_tracing(value) end)
 
   return app
 end
 
 local M = {
   new = new,
+  new_standard_app = new_standard_app,
 }
 
 return M

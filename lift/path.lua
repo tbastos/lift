@@ -16,7 +16,7 @@ local config
 -- OS-specific constants
 local DIR_SEP = assert(package.config:sub(1, 1))
 local IS_WINDOWS = (DIR_SEP == '\\')
-local LIST_SEPS = (IS_WINDOWS and ';' or ';:')
+local LIST_SEPS = (IS_WINDOWS and ';,' or ';:,')
 local LIST_ELEM_PATT = '([^'..LIST_SEPS..']+)['..LIST_SEPS..']*'
 local LIST_SEPS_PATT = '['..LIST_SEPS..']+'
 

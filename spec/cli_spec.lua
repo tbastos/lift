@@ -1,6 +1,7 @@
 describe('Module lift.cli', function()
 
   local cli = require 'lift.cli'
+  local config = require 'lift.config'
   local diagnostics = require 'lift.diagnostics'
 
   local root, verifier
@@ -9,18 +10,18 @@ describe('Module lift.cli', function()
     verifier = diagnostics.Verifier.set_new()
   end)
 
-  it('offers Command:process(args) to parse & run commands', function()
+  it('can parse and run commands', function()
     local ok -- set to true when the root command is run
     root:action(function() ok = true end)
-    ok = false; root:process{'abc'} ; assert.True(ok)
+    ok = false; root:parse{'abc'}() ; assert.True(ok)
     assert.equal('abc', root.args[1])
   end)
 
   it('allows actions to return error messages', function()
     root:action(function() return 'booom' end)
     root:flag('f'):action(function() return 'oops' end)
-    assert.error_matches(function() root:process{} end, 'booom')
-    assert.error_matches(function() root:process{'-f'} end, 'oops')
+    assert.error_matches(function() root:parse{}() end, 'booom')
+    assert.error_matches(function() root:parse{'-f'}() end, 'oops')
   end)
 
   describe('when parsing args', function()
@@ -147,11 +148,11 @@ describe('Module lift.cli', function()
     assert.same(verifier[#verifier],
       diagnostics.new("warning: unused argument '${1}'", 'wasted'))
 
-    assert.error(function() root:process({'one', 'two'}) end,
+    assert.error(function() root:parse{'one', 'two'}() end,
       'missing argument <three>')
   end)
 
-  it('supports subcommand hierarchies', function()
+  it('supports subcommand hierarchies and command aliases', function()
     local called, with
     local function spy(cmd) called = cmd.name ; with = cmd.args end
     root:action(spy):option('o')
@@ -160,39 +161,90 @@ describe('Module lift.cli', function()
     local sub3 = sub1:command('sub3'):action(spy) ; sub3:option('o')
     local sub4 = sub3:command('sub4'):action(spy) ; sub4:option('o')
 
-    root:process({'x', 'sub1', '-o=1'})
+    root:parse{'x', 'sub1', '-o=1'}()
     assert.equal('', called) ; assert.equal(2, #with)
 
-    assert.error(function() root:process({'sub1', '-o=1'}) end,
+    assert.error(function() root:parse{'sub1', '-o=1'}() end,
       'unknown option -o for command sub1')
 
-    root:process({'-o=1', 'sub1', 'x', '-o1=2', 'sub2'})
+    sub1:alias 's1'
+    root:parse{'-o=1', 's1', 'x', '-o1=2', 'sub2'}()
     assert.equal('1', root:get'o')
     assert.equal('sub1', called)
     assert.equal(2, #with)
 
-    assert.error(function() root:process({'sub2', '-o1=1'}) end,
+    assert.error(function() root:parse{'sub2', '-o1=1'}() end,
       'unknown option -o1 for command sub2')
 
-    root:process({'sub2', 'y', '-o', 'x'})
+    root:parse{'sub2', 'y', '-o', 'x'}()
     assert.equal('sub2', called) ; assert.equal(1, #with)
     assert.equal('1', root:get'o') ; assert.equal('x', sub2:get'o')
 
-    root:process({'-o=1', 'sub1', '-o1=2', 'sub3', '-o=3', 'x'})
+    root:parse{'-o=1', 'sub1', '-o1=2', 'sub3', '-o=3', 'x'}()
     assert.equal('1', root:get'o') ; assert.equal('2', sub1:get'o1')
     assert.equal('sub1 sub3', called)
     assert.equal(1, #with) ; assert.equal('3', sub3:get'o')
 
-    root:process({'-o=2', 'sub1', '-o1=3', 'sub3', '-o=4',
-      'sub4', 'x', '-o=5'})
+    root:parse{'-o=2', 'sub1', '-o1=3', 'sub3', '-o=4', 'sub4', 'x', '-o=5'}()
     assert.equal('2', root:get'o') ; assert.equal('3', sub1:get'o1')
     assert.equal('4', sub3:get'o') ; assert.equal('sub1 sub3 sub4', called)
     assert.equal(1, #with) ; assert.equal('5', sub4:get'o')
   end)
 
-  it('offer a help system', function()
-    assert.matches("help .* Print help for one command and exit",
-      table.concat(root:get_help()))
+  it("checks for name clashes", function()
+    root:command'cmd':alias'c'
+    root:option'opt':alias'o'
+    assert.error(function() root:command'cmd' end, "redefinition of command 'cmd'")
+    assert.error(function() root:command'c' end, "redefinition of command 'c'")
+    assert.error(function() root:option'opt' end, "redefinition of option 'opt'")
+    assert.error(function() root:option'o' end, "redefinition of option 'o'")
+  end)
+
+  describe("default root command", function()
+    local exit = os.exit
+    -- luacheck: push
+    -- luacheck: ignore os
+    before_each(function()
+      os.exit = function() error('os.exit') end
+    end)
+    after_each(function()
+      os.exit = exit
+    end)
+    -- luacheck: pop
+
+    it("implements --help", function()
+      local _, out = diagnostics.capture(function()
+        root:parse{'--help'}()
+      end)
+      assert.match("^Usage:.* help .* Print help for one command and exit", out)
+    end)
+
+    it("implements --version", function()
+      local _, out = diagnostics.capture(function()
+        root:parse{'--version'}()
+      end)
+      assert.equal(config.LIFT_VERSION..'\n', out)
+    end)
+
+  end)
+
+  describe("new_standard_app()", function()
+
+    local app
+    before_each(function()
+      app = cli.new_standard_app()
+    end)
+
+    it("implements 'config list'", function()
+      local ok, out = diagnostics.capture(function()
+        config.reset()
+        config.my_var = 1
+        app:parse{'--color=no', 'config', 'list'}()
+      end)
+      assert.True(ok)
+      assert.equal('\n-- from cli\nmy_var = 1\n', out)
+    end)
+
   end)
 
 end)
