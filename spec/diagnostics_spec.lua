@@ -80,6 +80,8 @@ describe('Module lift.diagnostics', function()
 
     -- shorthand version of the above checks:
     assert.no_error(function() verifier:verify{'first', 'second'} end)
+    assert.error_matches(function() verifier:verify{'first'} end,
+      'expected 1 but got 2 diagnostics')
 
     -- verifier should receive all diagnostics except the 'ignored' ones
     diagnostics.report('ignored: not reported')
@@ -90,14 +92,24 @@ describe('Module lift.diagnostics', function()
 
   it("provides wrap(f) to automatically report diagnostics", function()
     local ferr = io.tmpfile()
+    diagnostics.set_tracing(true)
     diagnostics.set_stderr(ferr)
     diagnostics.wrap(function()
-      diagnostics.report 'fatal: zomg!'
+      diagnostics.trace('tracing!', function()
+        diagnostics.new('error: zomg!')
+          :source_location('dummy.lua', 'omg error', 5):report()
+      end)
     end)
     diagnostics.set_stderr(io.stderr)
+    diagnostics.set_tracing(false)
     ferr:seek('set')
     local out = ferr:read('*a')
-    assert.equal('Error: zomg!\n', out)
+    assert.match([[
+tracing!
+dummy%.lua:1:5: error: zomg!
+  Elapsed time .*s
+
+Total time .*, memory .*]], out)
   end)
 
 end)

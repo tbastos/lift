@@ -175,7 +175,7 @@ end
 function Verifier:verify(str_list)
   -- lists must have the same length
   if #self ~= #str_list then
-    error({expected = #str_list, actual = #self, diagnostics = self}, 2)
+    error('expected '..#str_list..' but got '..#self..' diagnostics', 2)
   end
   for i = 1, #self do
     local expected = str_list[i]
@@ -210,7 +210,7 @@ end
 
 function Reporter:report(d)
   local style = styles[d.kind] or styles[d.level]
-  local loc, prefix = d.loc, style.prefix
+  local loc, prefix = d.location, style.prefix
   if loc then -- some diagnostics include a source location
     stderr:write(ESC'bold;white',
       loc.file, ':', loc.line, ':', loc.column, ': ')
@@ -321,10 +321,12 @@ local function wrap(f)
   end
   if tracing then
     local dt, mem = (clock() - t0), collectgarbage 'count'
-    local unit = 'K'
-    if mem > 1024 then mem = mem / 1024 ; unit = 'M' end
-    local msg = ('time %.2fs, memory %i%s'):format(dt, mem, unit)
-    stderr:write(ESC'cyan', '\nTotal ', msg, ESC'clear', '\n' )
+    local fmt = 'time %.2fs, memory %iK'
+    if mem > 1024 then
+      mem = mem / 1024
+      fmt = 'time %.2fs, memory %.2fM'
+    end
+    stderr:write(ESC'cyan', '\nTotal ', fmt:format(dt, mem), ESC'clear', '\n' )
   end
   return ok, diag
 end
