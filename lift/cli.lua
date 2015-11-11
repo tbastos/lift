@@ -4,6 +4,7 @@
 
 local unpack = table.unpack or unpack -- Lua 5.1 compatibility
 
+local path = require 'lift.path'
 local config = require 'lift.config'
 local lift_str = require 'lift.string'
 local diagnostics = require 'lift.diagnostics'
@@ -324,6 +325,15 @@ end
 -- Configuration System
 ------------------------------------------------------------------------------
 
+local function config_get(command)
+  local key = command:consume('key')
+  local value = config[key]
+  if type(value) ~= 'string' then
+    value = lift_str.format(value)
+  end
+  io.write(value)
+end
+
 local function config_list(command)
   local write, prev_scope = io.write, nil
   config:list_vars(function(key, value, scope, overridden)
@@ -342,12 +352,29 @@ local function config_list(command)
   end, true)
 end
 
+local function config_edit(command)
+  local sys = command.options.system.value
+  local dir = sys and config.system_config_dir or config.user_config_dir
+  local filename = path.from_slash(dir..'/'..config.config_file_name)
+  local cmd = ('%s %q'):format(config.editor, filename)
+  diagnostics.report('remark: running ${1}', cmd)
+  os.execute(cmd)
+end
+
 local function register_config(app)
   local config_cmd = app:command 'config'
     :desc('config', 'Configuration management subcommands')
 
-  config_cmd:command('list') :action(config_list)
-    :desc('config list', 'List config variables along with their values.')
+  config_cmd:command 'edit' :action(config_edit)
+    :desc('config edit [-s]', 'Opens the config file in an editor')
+      :flag 'system' :alias 's'
+      :desc('-s, --system', "Edit the system's config file instead of the user's")
+
+  config_cmd:command 'get' :action(config_get)
+    :desc('config get <key>', 'Print a config value to stdout')
+
+  config_cmd:command 'list' :action(config_list)
+    :desc('config list', 'List config variables along with their values')
 end
 
 ------------------------------------------------------------------------------
@@ -355,7 +382,7 @@ end
 ------------------------------------------------------------------------------
 
 local function print_version()
-  io.write(config.APP_VERSION, '\n')
+  io.write(config.APP_VERSION)
   os.exit()
 end
 

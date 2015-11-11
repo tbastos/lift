@@ -4,7 +4,7 @@
 
 Lift is both a build tool (**task runner**) and a **framework** for writing CLI tools in Lua. It's well suited for writing compilers, generators, checkers, and so forth.
 
-**WARNING:** NOT READY FOR USE YET! It will be released soon. Interested? Leave a star! :smiley:
+**WARNING:** NOT READY FOR USE YET! Lift will be released soon. Interested? Leave a star! :smiley:
 
 ## Features
 

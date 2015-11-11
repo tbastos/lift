@@ -82,6 +82,8 @@ describe('Module lift.diagnostics', function()
     assert.no_error(function() verifier:verify{'first', 'second'} end)
     assert.error_matches(function() verifier:verify{'first'} end,
       'expected 1 but got 2 diagnostics')
+    assert.error_matches(function() verifier:verify{'first', 'nop'} end,
+      'mismatch at diagnostic #2\nActual: Error: second\nExpected: nop')
 
     -- verifier should receive all diagnostics except the 'ignored' ones
     diagnostics.report('ignored: not reported')

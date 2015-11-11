@@ -223,7 +223,7 @@ describe('Module lift.cli', function()
       local _, out = diagnostics.capture(function()
         root:parse{'--version'}()
       end)
-      assert.equal(config.LIFT_VERSION..'\n', out)
+      assert.equal(config.LIFT_VERSION, out)
     end)
 
   end)

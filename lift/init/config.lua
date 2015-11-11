@@ -10,6 +10,15 @@ if not config.config_file_name then
   config.config_file_name = 'config.lua'
 end
 
+-- Default editor
+if not config.editor then
+  local v = config.EDITOR
+  if not v then
+    v = config.IS_WINDOWS and 'notepad' or 'vi'
+  end
+  config.editor = v
+end
+
 ------------------------------------------------------------------------------
 -- Portable Directory Paths: {system,user}_{config,data}_dir and cache_dir
 -- We follow the XDG specification on UNIX and something sensible on Windows.
