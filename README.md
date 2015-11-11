@@ -1,15 +1,14 @@
-#<img src="https://tbastos.github.io/i/lift.svg" height="96" align="right"/>Lift – Write powerful tools in Lua
+#<img src="https://tbastos.github.io/i/lift.svg" height="96" align="right"/>Lift – Lua infrastructure for tools
 
 [![Build status on UNIX](https://travis-ci.org/tbastos/lift.svg?branch=master)](https://travis-ci.org/tbastos/lift) [![Build status on Windows](https://ci.appveyor.com/api/projects/status/j15esm249a67d7f6?svg=true)](https://ci.appveyor.com/project/tbastos/lift) [![Coverage Status](https://coveralls.io/repos/tbastos/lift/badge.svg?branch=master&service=github)](https://coveralls.io/github/tbastos/lift?branch=master) [![License](http://img.shields.io/badge/License-MIT-brightgreen.svg)](LICENSE)
 
-Lift is both a build tool (**task runner**) and a **framework** for writing CLI tools in Lua. It's well suited for writing compilers, generators, checkers, and so forth.
+Lift is both a **task automation tool** and a **framework** for writing command-line tools in Lua. It's well suited for writing build scripts, compilers, generators, checkers, and so forth.
 
 **WARNING:** NOT READY FOR USE YET! Lift will be released soon. Interested? Leave a star! :smiley:
 
 ## Features
-
-- Tasks can be defined declaratively or written imperatively as Lua functions.
-- Transparent multitasking based on coroutines, _asynchronous I/O_ and _process concurrency_.
+- Tasks have prerequisites and can be written declaratively or imperatively as Lua functions.
+- Transparent multitasking based on coroutines, _asynchronous I/O_ and _process-level concurrency_.
 - Diagnostics engine for high-quality error reporting, tracing and testing.
 - Command-line interface and application configuration framework.
 - General-purpose [LPeg]-based parsing and AST manipulation framework.
