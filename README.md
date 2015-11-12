@@ -8,17 +8,17 @@ Lift is both a **task automation tool** and a **framework** for writing command-
 
 ## Features
 - Tasks have prerequisites and can be written declaratively or imperatively as Lua functions.
-- Transparent multitasking based on coroutines, _asynchronous I/O_ and _process-level concurrency_.
+- Transparent multitasking based on coroutines and _asynchronous I/O_ (using [libuv]).
 - Diagnostics engine for high-quality error reporting, tracing and testing.
 - Command-line interface and application configuration framework.
 - General-purpose [LPeg]-based parsing and AST manipulation framework.
 - Text templating engine with support for embedded Lua, partials and indentation.
-- Modular, extensible architecture.
+- Modular, extensible architecture with plugins.
 
 ### Prerequisites
 - **OS:** Linux, OSX or Windows (should work on any POSIX system)
 - **Lua:** 5.1, 5.2 or 5.3 (or a compatible LuaJIT)
-- **Libraries:** [LFS], [LPeg]
+- **Libraries:** [LPeg], [LFS] or [lluv]
  
 ## Installation
 
@@ -42,7 +42,7 @@ The following projects have in some way influenced Lift's design:
 - Configuration: [NPM], [CMake], [Vim]
 - Diagnostics: [Clang]
 - Path API: [Go]
-- Task/Build engine: [Rake]/[Jake], [Tup]
+- Task/build system: [Rake]/[Jake], [Gulp], [Tup]
 
 [argparse]: https://github.com/mpeterv/argparse
 [busted]: http://olivinelabs.com/busted
@@ -50,8 +50,11 @@ The following projects have in some way influenced Lift's design:
 [CMake]: http://www.cmake.org/
 [DSL]: http://en.wikipedia.org/wiki/Domain-specific_language
 [Go]: http://golang.org/pkg/path/filepath/
-[Jake]: http://jakejs.com/docs
+[Gulp]: http://gulpjs.com/
+[Jake]: http://jakejs.com/
 [LFS]: http://keplerproject.github.io/luafilesystem/
+[libuv]: http://libuv.org/
+[lluv]: https://github.com/moteus/lua-lluv
 [LPeg]: http://www.inf.puc-rio.br/~roberto/lpeg/
 [Lua]: http://www.lua.org/
 [LuaRocks]: http://www.luarocks.org/
