@@ -38,7 +38,7 @@ local lfs = require 'lfs'
 local __cwd, __dir, __stat = lfs.currentdir, lfs.dir, lfs.attributes
 
 local function cwd() return to_slash(__cwd()) end
-local function list_dir(path) return __dir(from_slash(path)) end
+local function read_dir(path) return __dir(from_slash(path)) end
 local function mkdir(path) return lfs.mkdir(from_slash(path)) end
 local function stat(path, attr)
   return __stat(from_slash(path), attr or 'mode')
@@ -194,7 +194,7 @@ end
 ------------------------------------------------------------------------------
 -- Globbing patterns with ${var} expansion and n-fold ${list} products
 ------------------------------------------------------------------------------
--- Based on dynamically-generated closure factories for efficiency.
+-- Based on auto-generated "closure" iterator factories for efficiency.
 -- Each factory handles a pattern with a specific number of components.
 -- A component is either: a string, a list, or a glob pattern.
 
@@ -219,7 +219,7 @@ local function init(c, t, i) -- i = number of valid elements in t
   end
   if type(c) == 'table' then return next_l, 0 end -- list
   if str_find(c, '[*?[]') then -- pattern
-    local _, dir_obj = list_dir(path) ; return next_p, dir_obj
+    local _, dir_obj = read_dir(path) ; return next_p, dir_obj
   end
   return next_s, c -- string
 end
@@ -253,9 +253,9 @@ local function add_str(t, n, lstr, str)
   n = n + 1 ; t[n] = str ; return n, str
 end
 
--- Returns a list with the names of all files matching the glob pattern.
--- Supports hierarchical names such as '/usr/*/bin/lua*'. The pattern
--- can be absolute or relative, yet returned names are always absolute.
+-- Returns an iterator over the files matching the glob pattern.
+-- Supports patterns such as '/${list}/*/bin/lua*'. The input pattern
+-- can be absolute or relative. Returned filenames are always absolute.
 local function glob(pattern, env, enable_debug)
   local match_var, match_patt_elem = '%${([^}]+)}', '([^/]*[*?[][^/]*)'
   local t, n, i, lstr = {}, 0, 1 -- template list, #t, position in pattern
@@ -333,7 +333,9 @@ local M = {
   is_root = is_root,
   join = join,
   make = make,
+  mkdir = mkdir,
   match = match,
+  read_dir = read_dir,
   rel = rel,
   split = split,
   split_list = split_list,
@@ -341,8 +343,7 @@ local M = {
   volume_name = volume_name,
 }
 
-package.loaded['lift.path'] = M
-
 -- solve mutual dependency with lift.config
+package.loaded['lift.path'] = M
 config = require 'lift.config'
 

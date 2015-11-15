@@ -52,14 +52,15 @@ Hello {{name}}!
 
   it('loads templates by absolute filename', function()
     template.set_env(_G)
-    local s = render_file(config.LIFT_SRC_DIR..'/../spec/data/templates/row.lua',
+    local s = render_file(config.LIFT_SRC_DIR..'/../spec/files/templates/row.lua',
       {k = 'pi', v = 3.14})
     assert.equal("pi = 3.14", s)
   end)
 
   it('loads templates relative to the ${load_path}', function()
     config.reset()
-    config.load_path = 'spec/data'
+    config:new_parent('cli')
+    config.load_path = 'spec/files'
     local s = render_file('templates/file.lua', _G)
     assert.equal(s, [[
 pi = 3.1415
@@ -74,7 +75,8 @@ pi = 3.1415
 
   it('handles errors in template files', function()
     config.reset()
-    config.load_path = 'spec/data'
+    config:new_parent('cli')
+    config.load_path = 'spec/files'
     assert.error_matches(function() render_file('non_existing.lua') end,
       "cannot find template 'non_existing.lua'")
     assert.error_matches(function() render_file('templates/invalid.lua') end,

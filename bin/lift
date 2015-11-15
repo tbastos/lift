@@ -4,18 +4,36 @@
 
 local cli = require 'lift.cli'
 local config = require 'lift.config'
+local loader = require 'lift.loader'
 local diagnostics = require 'lift.diagnostics'
 
-local app = cli.new_standard_app()
+local app = cli.new()
 function app:run()
   -- TODO
   self:consume('command')
 end
 
 local ok = diagnostics.wrap(function()
-  local command = app:parse(arg)
-  config:init()
-  command()
+
+  -- parse key=value configs at the beginning of arg list
+  local cli_scope = config:new_parent('cli')
+  cli.parse_config(arg)
+
+  -- run init scripts
+  local top_scope = loader.init()
+
+  -- make cli configs override init configs
+  assert(top_scope:get_parent() == cli_scope)
+  top_scope:set_parent(cli_scope:get_parent())
+  cli_scope:set_parent(config:get_parent())
+  config:set_parent(cli_scope)
+
+  -- run CLI scripts
+  loader.load_all('cli', nil, app)
+
+  -- process CLI
+  app:process(arg)
+
 end)
 
 os.exit(ok and 0 or 1) -- Lua 5.1 compatibility

@@ -6,16 +6,13 @@
 -- integrate one through a diagnostics consumer. The focus here is
 -- on an error handling system well suited to tools and compilers.
 
-local clock = os.clock
-local rawget = rawget
-local str_find = string.find
-local tostring = tostring
-local type = type
+local rawget, tostring, type = rawget, tostring, type
 local unpack = table.unpack or unpack -- Lua 5.1 compatibility
-
+local clock = os.clock
+local str_find = string.find
 local dbg_upvalue, dbg_traceback = debug.getupvalue, debug.traceback
 
-local str = require 'lift.string'
+local lstring = require 'lift.string'
 local color = require 'lift.color'
 local ESC = color.ESC
 
@@ -80,7 +77,7 @@ local Diagnostic = {
 -- compute diag.message at the first access
 function Diagnostic:__index(k)
   if k == 'message' then
-    local msg = str.expand(rawget(self, 0) or 'unknown issue', self)
+    local msg = lstring.expand(rawget(self, 0) or 'unknown issue', self)
     self.message = msg
     return msg
   end
@@ -121,7 +118,7 @@ function Diagnostic:__tostring() return self.message end
 function Diagnostic:render()
   local loc, txt, kind = self.location, '', self.kind
   if loc then txt = loc.file .. ':' .. loc.line .. ':' .. loc.column .. ': '
-  else kind = str.capitalize(kind) end
+  else kind = lstring.capitalize(kind) end
   return txt .. kind .. ': ' .. self.message
 end
 
@@ -215,7 +212,7 @@ function Reporter:report(d)
     stderr:write(ESC'bold;white',
       loc.file, ':', loc.line, ':', loc.column, ': ')
   else
-    prefix = str.capitalize(prefix)
+    prefix = lstring.capitalize(prefix)
   end
   stderr:write(color.from_style(style), prefix, ESC'clear',
     style.sep or ' ', d.message, ESC'clear', '\n')
@@ -250,13 +247,13 @@ local _f ; local function _expander(name)
   return nil
 end
 local function expand_up(message, f)
-  _f = f ; return str.expand(message, _expander)
+  _f = f ; return lstring.expand(message, _expander)
 end
 
 -- Traces a call to f(). If tracing is enabled, msg is expanded with f's
 -- upvalues and printed to stderr. Also, if diagnostics.pcall() catches
 -- an error, it prints msg in the activity trace.
-local function trace(msg, f)
+local function trace(msg, f, ...)
   local n, t0 = #stack
   stack[n + 1] = msg
   stack[n + 2] = f
@@ -264,7 +261,7 @@ local function trace(msg, f)
     if n == 0 then t0 = clock() end -- measure the time of 1st-level calls
     stderr:write(ESC'clear;blue', (' '):rep(n), expand_up(msg, f), '\n')
   end
-  f()
+  f(...)
   assert(#stack == n + 2, 'unbalanced activity stack')
   stack[n + 2] = nil
   stack[n + 1] = nil
@@ -361,6 +358,19 @@ local function capture(f)
 end
 
 ------------------------------------------------------------------------------
+-- Utility functions to help debug programs
+------------------------------------------------------------------------------
+
+-- Pretty prints a value to stdout.
+local function pp(value, label)
+  if label then
+    io.write(label, ' = ', lstring.format(value), '\n')
+  else
+    io.write(lstring.format(value), '\n')
+  end
+end
+
+------------------------------------------------------------------------------
 -- Module Table
 ------------------------------------------------------------------------------
 
@@ -371,6 +381,7 @@ local M = {
   levels = levels,
   new = new,
   pcall = pcall,
+  pp = pp,
   report = report, Reporter = Reporter,
   set_consumer = set_consumer,
   set_stderr = set_stderr,

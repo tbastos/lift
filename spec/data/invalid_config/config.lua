@@ -1,1 +1,0 @@
-if end then error

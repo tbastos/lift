@@ -8,8 +8,6 @@ local assert, type = assert, type
 local rawget, rawset, getmetatable = rawget, rawset, getmetatable
 local getenv, tinsert = os.getenv, table.insert
 
-local utils = require 'lift.utils'
-
 ------------------------------------------------------------------------------
 -- The immutable root scope (methods, constants, access to env vars)
 ------------------------------------------------------------------------------
@@ -18,10 +16,10 @@ local env_vars = {} -- helper table to get env vars
 local root = setmetatable({}, {id = 'built-in constants', __index = env_vars})
 local config = {} -- the lift.config scope (a proxy)
 
--- solve mutual dependency with lift.path
+-- solve mutual dependencies
 package.loaded['lift.config'] = config
 local path = require 'lift.path'
-local diagnostics = require 'lift.diagnostics'
+local utils = require 'lift.utils'
 
 -- enable access to env vars through root
 setmetatable(env_vars, {id = 'environment variables', __index = function(t, k)
@@ -40,21 +38,27 @@ local function __newindex(t, k, v)
   rawset(t, k, v)
 end
 
--- Creates a child scope that inherits from parent (default = root).
-function root.new_scope(parent, id)
-  return setmetatable({}, {id = id or '?',
-    __index = parent or root, __newindex = __newindex})
+-- Returns the parent of a scope.
+function root:get_parent()
+  return assert(getmetatable(self)).__index
 end
 
 -- Sets the parent of a scope.
 function root:set_parent(new_parent)
   assert(self ~= root, "the root scope's parent cannot be changed")
   assert(getmetatable(self)).__index = new_parent
+  return new_parent
 end
 
--- Returns the parent of a scope.
-function root:get_parent()
-  return assert(getmetatable(self)).__index
+-- Creates a child scope that inherits from parent (default = root).
+function root.new_child(parent, id)
+  return setmetatable({}, {id = id or '?',
+    __index = parent or root, __newindex = __newindex})
+end
+
+-- Sets a new parent scope for child that inherits from the previous parent.
+function root.new_parent(child, id)
+  return child:set_parent(child:get_parent():new_child(id))
 end
 
 -- Returns the string that identifies a scope.
@@ -73,7 +77,7 @@ end
 setmetatable(config, configMT)
 
 ------------------------------------------------------------------------------
--- Scope Methods
+-- Scope Data Methods
 ------------------------------------------------------------------------------
 
 -- Gets a var as a list. If the variable is a scalar it will be first converted
@@ -143,17 +147,6 @@ function root:insert_unique(list_name, value, pos)
   return self
 end
 
--- Loads a config file into this scope.
-function root:load(filename)
-  local f, err = loadfile(path.from_slash(filename), 't')
-  if f then
-    f(self)
-  else
-    local trace = debug.traceback(nil, 2)
-    diagnostics.new{'lua_error: ${1}', err, traceback = trace}:report()
-  end
-end
-
 -- For each var call callback(key, value, scope_id, overridden).
 -- This includes inherited vars but excludes constants.
 -- Overridden vars are only included if `include_overridden` is true.
@@ -182,50 +175,10 @@ end
 -- Module Methods
 ------------------------------------------------------------------------------
 
-local function load_config(from_dir, filename)
-  filename = path.abs(from_dir..'/'..(filename or config.config_file_name))
-  if not path.is_file(filename) then return false end
-  local scope = config:get_parent():new_scope(filename)
-  diagnostics.trace('Loading '..filename, function()
-    scope:load(filename)
-  end)
-  config:set_parent(scope)
-  return true
-end
-
--- Loads all available config files based on the current ${load_path}.
--- Each file may read and overwrite variables set by previously-loaded files.
--- The first loaded file is "${LIFT_SRC_DIR}/init/config.lua" (hardcoded).
--- Files are then loaded in the reverse order of entry in ${load_path}.
--- This usually means that global configs are loaded next, then user
--- configs, then local filesystem configs (from root down to the CWD).
-function root.init()
-  diagnostics.trace('Loading configuration files', function()
-    assert(load_config(config.LIFT_SRC_DIR, 'init/config.lua'),
-      "missing Lift's built-in configuration file")
-    local paths = config.load_path
-    for i = #paths - 1, 1, -1 do
-      load_config(paths[i])
-    end
-    -- prioritize the cli scope
-    local first_scope = config:get_parent()
-    local cli_scope, cli_child = first_scope, config
-    while cli_scope ~= root do
-      if cli_scope:get_id() == 'cli' then
-        cli_child:set_parent(cli_scope:get_parent())
-        cli_scope:set_parent(first_scope)
-        config:set_parent(cli_scope)
-        break
-      end
-      cli_child, cli_scope = cli_scope, cli_scope:get_parent()
-    end
-  end)
-end
-
 -- Reverts lift.config to its initial state.
--- Doesn't affect constants set through set_const().
+-- This doesn't affect constants set through set_const().
 function root.reset()
-  config:set_parent(root:new_scope('cli'))
+  config:set_parent(root)
 end
 
 -- Allows apps to configure their own constants at startup.
@@ -246,6 +199,3 @@ config.set_const('DIR_SEPARATOR', package.config:sub(1, 1))
 config.set_const('IS_WINDOWS', (root.DIR_SEPARATOR == '\\'))
 config.set_const('EXE_NAME', (arg and arg[0]) or '?')
 assert(type(config.EXE_NAME == 'string'))
-
--- finish config's initialization
-config.reset()

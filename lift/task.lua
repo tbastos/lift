@@ -2,8 +2,7 @@
 -- Task Engine
 ------------------------------------------------------------------------------
 
-local ipairs = ipairs
-local assert = assert
+local assert, ipairs = assert, ipairs
 
 local diagnostics = require 'lift.diagnostics'
 

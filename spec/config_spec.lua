@@ -5,6 +5,7 @@ describe('Module lift.config', function()
 
   before_each(function()
     config.reset()
+    config:new_parent('cli')
     diagnostics.Verifier.set_new()
   end)
 
@@ -32,13 +33,13 @@ describe('Module lift.config', function()
       config.version = 'c1'
       assert.equal('c1', config.version)
 
-      local s1 = config:new_scope()
+      local s1 = config:new_child()
       assert.equal('c1', s1.version)
       s1.version = 's1'
       assert.equal('s1', s1.version)
       assert.equal('c1', config.version)
 
-      local s2 = s1:new_scope()
+      local s2 = s1:new_child()
       assert.equal('s1', s2.version)
       s2.version = 's2'
       assert.equal('s2', s2.version)
@@ -83,34 +84,6 @@ describe('Module lift.config', function()
       assert.same({1, 2, 5}, config.unq)
     end)
 
-    it('have :load() to load a config file into the scope', function()
-      local scope = config:new_scope()
-      assert.equal(nil, scope.pi)
-      scope:load('spec/data/config.lua')
-      assert.equal(3.14, scope.pi)
-      assert.equal(nil, config.pi)
-      assert.equal('table', type(scope.path))
-
-      assert.error_matches(function() scope:load'spec/data/config_syntax_err.lua' end,
-        'unexpected symbol')
-    end)
-
-  end)
-
-  it('offers :init() to automatically load config files', function()
-    assert.Nil(config.pi)
-    config.load_path = 'spec/data'
-    config.user_config_dir = 'spec/data/user'
-    config.system_config_dir = 'spec/data/system'
-    config.init()
-    assert.equal(config.APP_VERSION, config.LIFT_VERSION)
-    assert.equal(3.14, config.pi)
-    assert.equal('user', config.opt1)
-    assert.same({'A','a','b','c','d'}, config.list)
-
-    config.reset()
-    config.load_path = 'spec/data;spec/data/invalid_config'
-    assert.error_matches(function() config.init() end, 'unexpected symbol')
   end)
 
 end)

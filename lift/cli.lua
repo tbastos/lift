@@ -2,17 +2,12 @@
 -- Simple, composable Command-Line Interfaces with command hierarchies
 ------------------------------------------------------------------------------
 
+local assert, ipairs, pairs, type = assert, ipairs, pairs, type
 local unpack = table.unpack or unpack -- Lua 5.1 compatibility
 
-local path = require 'lift.path'
 local config = require 'lift.config'
-local lift_str = require 'lift.string'
 local diagnostics = require 'lift.diagnostics'
-
 local to_bool = require('lift.string').to_bool
-
-local color = require 'lift.color'
-local ESC = color.ESC
 
 ------------------------------------------------------------------------------
 -- Option (an optional value specified for a command)
@@ -70,9 +65,11 @@ function Command:__call()
   local err = self:run() -- returns nil on success, string on error
   if err then self:error('${1}', err) end
   local args = self.args
-  local used = args.used
-  if used and used < #args then
-    diagnostics.report("warning: unused argument '${1}'", args[used + 1])
+  if args then
+    local used = args.used
+    if used and used < #args then
+      diagnostics.report("warning: unused argument '${1}'", args[used + 1])
+    end
   end
 end
 
@@ -145,6 +142,32 @@ end
 diagnostics.levels.cli_error = 'fatal'
 diagnostics.styles.cli_error = {prefix = 'command-line error:', fg = 'red'}
 
+function Command:error(msg, ...)
+  diagnostics.report{command = self, 'cli_error: '..msg, ...}
+end
+
+-- Parses key=value config settings and removes them from args.
+local function parse_config(args)
+  assert(type(args) == 'table', 'missing args')
+  local n, size = 1, #args
+  while n < size do
+    local s = args[n]
+    if s:sub(1, 1) == '-' then break end
+    local _, e, key = s:find('^([^=]+)=')
+    if not e then break end
+    config[key] = s:sub(e + 1)
+    n = n + 1
+  end
+  n = n - 1
+  if n > 0 then
+    -- shift remaining args
+    for i = 1, size do
+      args[i] = args[i + n]
+    end
+  end
+  return n
+end
+
 local function process_option(option, value, next_arg)
   local used_next = false
   if option.is_flag then
@@ -161,18 +184,14 @@ local function process_option(option, value, next_arg)
   return used_next, option(value)
 end
 
-function Command:error(msg, ...)
-  diagnostics.report{command = self, 'cli_error: '..msg, ...}
-end
-
--- processes options, matches args to (sub)command and returns (sub)command
-function Command:parse(args)
+-- Processes options, matches args to (sub)command and invokes (sub)command.
+function Command:process(args)
   assert(type(args) == 'table', 'missing args')
   assert(self.parent == nil, 'not a root command')
   local opts, cmd_args, num_args, i, last = true, {}, 0, 1, #args
   while i <= last do
     local s, _, e, dash, key, op = args[i]
-    if opts then _, e, dash, key, op = s:find('^(%-*)([^=]*)(=?)') end
+    if opts then _, e, dash, key, op = s:find('^(%-*)([^=]+)(=?)') end
     if not e or (dash == '' and op == '') then -- command arg
       local subcmd ; if num_args == 0 then subcmd = self.commands[s] end
       if subcmd then self = subcmd -- use subcommand instead
@@ -183,14 +202,20 @@ function Command:parse(args)
       if dash == '' and op ~= '' then -- config setting
         config[key] = value
       else -- option
-        local option = self.options[key]
+        -- match option to a command
+        local opt_cmd, option = self
+        repeat
+          option = opt_cmd.options[key]
+          if option then break end
+          opt_cmd = opt_cmd.parent
+        until not opt_cmd
         if not option then
-          local msg = 'unknown option ${1} for command ${2}'
+          local msg = "unknown option ${1} for command '${2}'"
           if not self.parent then msg = 'unknown option ${1}' end
           self:error(msg, dash..key, self.name)
         end
         local used, err = process_option(option, value, args[i + 1])
-        if err then self:error('option ${1}: ${2}', dash..key, err)
+        if err then opt_cmd:error('option ${1}: ${2}', dash..key, err)
         elseif used then i = i + 1 end
       end
     end
@@ -198,7 +223,7 @@ function Command:parse(args)
   end
   cmd_args[0] = self.name
   self:matched(cmd_args)
-  return self, cmd_args
+  self()
 end
 
 ------------------------------------------------------------------------------
@@ -322,62 +347,6 @@ local function register_help(app)
 end
 
 ------------------------------------------------------------------------------
--- Configuration System
-------------------------------------------------------------------------------
-
-local function config_get(command)
-  local key = command:consume('key')
-  local value = config[key]
-  if type(value) ~= 'string' then
-    value = lift_str.format(value)
-  end
-  io.write(value)
-end
-
-local function config_list(command)
-  local write, prev_scope = io.write, nil
-  config:list_vars(function(key, value, scope, overridden)
-    if scope ~= prev_scope then
-      write(ESC'dim', '\n-- from ', scope, ESC'clear', '\n')
-      prev_scope = scope
-    end
-    if overridden then
-      write(ESC'dim;red', tostring(key), ESC'clear',
-        ESC'dim', ' (overridden)', ESC'clear', '\n')
-    else
-      write(ESC'red', tostring(key), ESC'clear',
-        ESC'green', ' = ', ESC'clear',
-        ESC'cyan', lift_str.format(value), ESC'clear', '\n')
-    end
-  end, true)
-end
-
-local function config_edit(command)
-  local sys = command.options.system.value
-  local dir = sys and config.system_config_dir or config.user_config_dir
-  local filename = path.from_slash(dir..'/'..config.config_file_name)
-  local cmd = ('%s %q'):format(config.editor, filename)
-  diagnostics.report('remark: running ${1}', cmd)
-  os.execute(cmd)
-end
-
-local function register_config(app)
-  local config_cmd = app:command 'config'
-    :desc('config', 'Configuration management subcommands')
-
-  config_cmd:command 'edit' :action(config_edit)
-    :desc('config edit [-s]', 'Opens the config file in an editor')
-      :flag 'system' :alias 's'
-      :desc('-s, --system', "Edit the system's config file instead of the user's")
-
-  config_cmd:command 'get' :action(config_get)
-    :desc('config get <key>', 'Print a config value to stdout')
-
-  config_cmd:command 'list' :action(config_list)
-    :desc('config list', 'List config variables along with their values')
-end
-
-------------------------------------------------------------------------------
 -- Module Table
 ------------------------------------------------------------------------------
 
@@ -389,7 +358,7 @@ end
 -- Returns a new root command with a minimal, UNIX-compliant CLI.
 local function new()
   local app = new_cmd()
-    :desc '[options] [key=value] <command> [<args>]'
+    :desc '[key=value] [options] <command> [<args>]'
     :epilog(root_epilog)
 
   register_help(app)
@@ -400,35 +369,9 @@ local function new()
   return app
 end
 
--- Returns a new root command with a more elaborate CLI that exposes many
--- useful framework features.
-local function new_standard_app()
-  local app = new()
-
-  -- hide options --help and --version
-  app.options.help.hidden = true
-  app.options.version.hidden = true
-
-  -- add config management subcommands
-  register_config(app)
-
-  -- enable colors by default on supported terminals
-  color.set_enabled(os.getenv('TERM') or os.getenv('ANSICON'))
-
-  app:flag 'color'
-    :desc('--color[=off]', 'Toggle colorized output')
-    :action(function(option, value) color.set_enabled(value) end)
-
-  app:flag 'trace'
-    :desc('--trace', 'Turn on debug tracing')
-    :action(function(option, value) diagnostics.set_tracing(value) end)
-
-  return app
-end
-
 local M = {
   new = new,
-  new_standard_app = new_standard_app,
+  parse_config = parse_config,
 }
 
 return M

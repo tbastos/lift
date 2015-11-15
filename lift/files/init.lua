@@ -1,14 +1,9 @@
 ------------------------------------------------------------------------------
--- Default Lift Configuration
+-- Initial Configuration
 ------------------------------------------------------------------------------
 
-local config = ...
 local path = require 'lift.path'
-
--- Default config_file_name
-if not config.config_file_name then
-  config.config_file_name = 'config.lua'
-end
+local config = require 'lift.config'
 
 -- Default editor
 if not config.editor then
@@ -76,7 +71,7 @@ local function add_path(p)
   end
 end
 
--- environment vars take precedence over everything except the CLI
+-- env vars have precedence over everything except the CLI
 if config.LOAD_PATH then
   for i, dir in ipairs(config:get_list('LOAD_PATH', true)) do
     add_path(dir)
@@ -94,6 +89,3 @@ end
 -- user and system-specific files
 add_path(config.user_config_dir)
 add_path(config.system_config_dir)
-
--- built-in lift files (has the least precedence)
-assert(add_path(config.LIFT_SRC_DIR..'/init'), "missing Lift's built-in files")
