@@ -7,7 +7,7 @@ source = {
 }
 
 description = {
-  summary = "Lua task runner and CLI tool development framework.",
+  summary = "Lua task automation tool and scripting framework.",
   homepage = "https://lift.run",
   license = "MIT/X11",
 }
@@ -26,12 +26,16 @@ build = {
     ["lift.color"] = "lift/color.lua",
     ["lift.config"] = "lift/config.lua",
     ["lift.diagnostics"] = "lift/diagnostics.lua",
+    ["lift.loader"] = "lift/loader.lua",
     ["lift.path"] = "lift/path.lua",
     ["lift.string"] = "lift/string.lua",
     ["lift.task"] = "lift/task.lua",
     ["lift.template"] = "lift/template.lua",
+    ["lift.utils"] = "lift/utils.lua",
 
-    ["lift.init.config"] = "lift/init/config.lua",
+    ["lift.files.cli"] = "lift/files/cli.lua",
+    ["lift.files.cli_config"] = "lift/files/cli_config.lua",
+    ["lift.files.init"] = "lift/files/init.lua",
   },
 
   install = {
