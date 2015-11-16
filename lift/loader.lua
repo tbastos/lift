@@ -2,7 +2,7 @@
 -- Find and Load Lua Files in the ${load_path}
 ------------------------------------------------------------------------------
 
-local ipairs, loadfile = ipairs, loadfile
+local loadfile = loadfile
 local str_find = string.find
 
 local path = require 'lift.path'
@@ -13,42 +13,54 @@ local is_dir, is_file, read_dir = path.is_dir, path.is_file, path.read_dir
 
 -- Returns an iterator over the Lua files in the ${load_path} that follow
 -- a certain naming convention and match the 'type' and 'subtype' strings.
--- The subtype defaults to '.*' when omitted, so all subtypes are matched.
+-- When subtype is omitted all subtypes are matched.
 --   ./${type}.lua
 --   ./${type}_${subtype}.lua
 --   ./${type}/${subtype}.lua
 --   ./${type}/${subtype}_*.lua
 local function find_scripts(type, subtype, reverse_order)
-  subtype = subtype or '.*'
-  local t, load_path = {}, config:get_list('load_path')
-  local patt, subpatt = '^'..type..'(_?).-%.lua$', '^'..subtype..'(_?).-%.lua$'
-  local start, limit, step = 1, #load_path, 1
-  if reverse_order then
-    start, limit, step = limit, start, -1
-  end
-  for i = start, limit, step do
-    local base_dir = load_path[i]
-    for name in read_dir(base_dir) do
-      if name == type and is_dir(name) then
-        local subdir = base_dir..'/'..name
-        for subname in read_dir(subdir) do
-          local _, e, sep = str_find(subtype, subpatt)
-          if e and (sep == '' or sep == '_') then
-            t[#t+1] = subdir..'/'..subname
+  subtype = subtype or '[^_]*'
+  local load_path = config:get_list('load_path')
+  local patt = '^'..type..'(_?)('..subtype..')%.lua$'
+  local subpatt = '^'..subtype..'(_?)(.*)%.lua$'
+  local i = (reverse_order and #load_path or 1)
+  local dir, dir_obj, subdir, subdir_obj
+  return function()
+    repeat -- iterate dirs in load_path
+      while dir do -- while we're in the same dir
+        repeat -- iterate names in dir
+          while subdir do -- while we're in the same subdir
+            repeat -- iterate names in subdir
+              local subname = subdir_obj:next()
+              if not subname then subdir = nil break end
+              local _, e, sep, sub = str_find(subname, subpatt)
+              if e and (sub == '' or sep == '_') then
+                local filename = subdir..'/'..subname
+                if is_file(filename) then return filename end
+              end
+            until false
           end
-        end
-      else
-        local _, e, sep = str_find(name, patt)
-        if e and (sep == '' or sep == '_') then
-          local filename = base_dir..'/'..name
-          if is_file(filename) then
-            t[#t+1] = filename
+          local name = dir_obj:next() ; if not name then dir = nil break end
+          if name == type then
+            local fullname = dir..'/'..name
+            if is_dir(fullname) then
+              subdir = fullname
+              local _ ; _, subdir_obj = read_dir(subdir)
+            end
+          else
+            local _, e, sep, sub = str_find(name, patt)
+            if e and (sub == '' or sep == '_') then
+              local filename = dir..'/'..name
+              if is_file(filename) then return filename end
+            end
           end
-        end
+        until false
       end
-    end
+      dir = load_path[i] ; if not dir then return nil end
+      i = i + (reverse_order and -1 or 1)
+      local _ ; _, dir_obj = read_dir(dir)
+    until false
   end
-  return t
 end
 
 local function _load_file(filename, ...)
@@ -66,7 +78,7 @@ local function load_file(filename, ...)
 end
 
 local function _load_all(type, subtype, ...)
-  for i, filename in ipairs(find_scripts(type, subtype)) do
+  for filename in find_scripts(type, subtype) do
     load_file(filename, ...)
   end
 end
@@ -92,7 +104,7 @@ local function init()
   local builtin_files = config.LIFT_SRC_DIR..'/files'
   local top_scope = _init(builtin_files..'/init.lua')
 
-  for i, script in ipairs(find_scripts('init', nil, true)) do
+  for script in find_scripts('init', nil, true) do
     _init(script)
   end
   config:insert_unique('load_path', builtin_files)
