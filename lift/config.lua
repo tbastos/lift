@@ -20,6 +20,7 @@ local config = {} -- the lift.config scope (a proxy)
 package.loaded['lift.config'] = config
 local path = require 'lift.path'
 local utils = require 'lift.utils'
+local lstring = require 'lift.string'
 
 -- enable access to env vars through root
 setmetatable(env_vars, {id = 'environment variables', __index = function(t, k)
@@ -79,6 +80,14 @@ setmetatable(config, configMT)
 ------------------------------------------------------------------------------
 -- Scope Data Methods
 ------------------------------------------------------------------------------
+
+-- Gets a var as a boolean.
+function root:get_bool(var_name)
+  local v = self[var_name] ; if not v or v == true then return v end
+  if type(v) == 'string' then v = lstring.to_bool(v) else v = true end
+  self[var_name] = v
+  return v
+end
 
 -- Gets a var as a list. If the variable is a scalar it will be first converted
 -- to a list. Strings are split using path.split_list(), other values are

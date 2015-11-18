@@ -46,7 +46,21 @@ describe('Module lift.config', function()
       assert.equal('s1', s1.version)
     end)
 
-    it('auto-convert vars to list with :get_list()', function()
+    it("auto-convert vars to boolean with get_bool()", function()
+      config.true_str = 'on'
+      config.false_str = 'off'
+      config.one_str = '1'
+      config.zero_str = '0'
+      config.zero_num = 0
+      assert.Nil(config:get_bool'undefined')
+      assert.True(config:get_bool'true_str')
+      assert.False(config:get_bool'false_str')
+      assert.True(config:get_bool'one_str')
+      assert.False(config:get_bool'zero_str')
+      assert.True(config:get_bool'zero_num')
+    end)
+
+    it('auto-convert vars to list with get_list()', function()
       config.foo = 3
       assert.equal(config:get_list('foo'), config.foo, {3})
       config.bar = 'a;b;c;'
@@ -55,7 +69,7 @@ describe('Module lift.config', function()
       assert.equal(config:get_list('nop'), config.nop, {x = 3})
     end)
 
-    it('have :insert() to insert into list vars', function()
+    it('have insert() to insert into list vars', function()
       config.lst = 1
       assert.equal(1, config.lst)
       config:insert('lst', 2)
@@ -64,12 +78,12 @@ describe('Module lift.config', function()
       assert.same({0, 1, 2}, config.lst)
     end)
 
-    it('auto-convert vars to unique list with :get_unique_list()', function()
+    it('auto-convert vars to unique list with get_unique_list()', function()
       config.unique = 'a;c;b;c;b;d;'
       assert.same(config:get_unique_list('unique'), {'a', 'c', 'b', 'd'})
     end)
 
-    it('have :insert_unique() to insert into unique lists', function()
+    it('have insert_unique() to insert into unique lists', function()
       config:insert_unique('unq', 2)
       config:insert_unique('unq', 5)
       config:insert_unique('unq', 2)

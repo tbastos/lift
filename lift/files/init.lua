@@ -1,9 +1,15 @@
 ------------------------------------------------------------------------------
--- Initial Configuration
+-- Initial Configurations
 ------------------------------------------------------------------------------
 
+local config = ...
 local path = require 'lift.path'
-local config = require 'lift.config'
+local lstring = require 'lift.string'
+
+-- Current working directory
+if not config.cwd then
+  config.cwd = path.cwd()
+end
 
 -- Default editor
 if not config.editor then
@@ -12,6 +18,42 @@ if not config.editor then
     v = config.IS_WINDOWS and 'notepad' or 'vi'
   end
   config.editor = v
+end
+
+-- Default project_file_names
+if not config.project_file_names then
+  config.project_file_names = {
+    lstring.capitalize(config.APP_ID)..'file.lua',
+    config.APP_ID..'file.lua',
+  }
+end
+
+-- Default project_dir_name
+if not config.project_files_dir_name then
+  config.project_files_dir_name = '.'..config.APP_ID
+end
+
+------------------------------------------------------------------------------
+-- Detect project_file and project_dir
+------------------------------------------------------------------------------
+
+do
+  local dir = config.cwd
+  repeat
+    for i, name in ipairs(config.project_file_names) do
+      local file = dir..'/'..name
+      if path.is_file(file) then
+        config.project_file = file
+        config.project_dir = dir
+        break
+      end
+    end
+    if path.is_dir(dir..'/'..config.project_files_dir_name) then
+      config.project_dir = dir
+      break
+    end
+    dir = path.dir(dir)
+  until #dir <= 1 or path.is_root(dir)
 end
 
 ------------------------------------------------------------------------------
@@ -78,12 +120,9 @@ if config.LOAD_PATH then
   end
 end
 
--- project-specific files (scan from CWD up to filesystem root)
-local dir = path.cwd()
-while true do
-  add_path(dir..'/.'..config.APP_ID)
-  if #dir <= 1 or path.is_root(dir) then break end
-  dir = path.dir(dir)
+-- project-specific files
+if config.project_dir then
+  add_path(config.project_dir..'/'..config.project_files_dir_name)
 end
 
 -- user and system-specific files
