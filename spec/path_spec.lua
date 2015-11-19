@@ -116,9 +116,8 @@ describe('Module lift.path', function()
   it('make() to create directory hierarchies', function()
     assert.no_error(function()
       assert(path.make'sub1/sub2')
-      local lfs = require 'lfs'
-      assert(lfs.rmdir('sub1/sub2'))
-      assert(lfs.rmdir('sub1'))
+      assert(path.rmdir('sub1/sub2'))
+      assert(path.rmdir('sub1'))
     end)
   end)
 

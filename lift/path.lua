@@ -34,12 +34,14 @@ local function from_slash(path)
   return DIR_SEP == '/' and path or path:gsub('/', DIR_SEP)
 end
 
+
 local lfs = require 'lfs'
 local __cwd, __dir, __stat = lfs.currentdir, lfs.dir, lfs.attributes
 
 local function cwd() return to_slash(__cwd()) end
 local function read_dir(path) return __dir(from_slash(path)) end
 local function mkdir(path) return lfs.mkdir(from_slash(path)) end
+local function rmdir(path) return lfs.rmdir(from_slash(path)) end
 local function stat(path, attr)
   return __stat(from_slash(path), attr or 'mode')
 end
@@ -337,6 +339,7 @@ local M = {
   match = match,
   read_dir = read_dir,
   rel = rel,
+  rmdir = rmdir,
   split = split,
   split_list = split_list,
   to_slash = to_slash,
