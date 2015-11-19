@@ -2,7 +2,7 @@
 -- Utility String Manipulation Routines
 ------------------------------------------------------------------------------
 
-local tostring, type = tostring, type
+local getmetatable, tostring, type = getmetatable, tostring, type
 local str_find = string.find
 local str_format = string.format
 local str_gsub = string.gsub
@@ -200,10 +200,19 @@ local function sb_format(sb, name, t, indent, max_len)
 end
 
 -- Formats any variable into a string. Handles tables and cycles.
-local function format(value, max_len)
+-- Treats objects with the __tostring metamethod as regular tables.
+local function format_table(value, max_len)
   local sb = {}
   sb_format(sb, '@', value, '', max_len or 78)
   return tbl_concat(sb)
+end
+
+-- Formats any variable into a string. Handles objects, tables and cycles.
+-- Uses the __tostring metamethod for objects that implement it.
+local function format(value, max_len)
+  local mt = getmetatable(value)
+  if mt and mt.__tostring then return tostring(value) end
+  return format_table(value, max_len)
 end
 
 ------------------------------------------------------------------------------
@@ -223,6 +232,7 @@ local M = {
   format_flat_list = format_flat_list,
   format_flat_table = format_flat_table,
   format_key = format_key,
+  format_table = format_table,
   format_value = format_value,
   from_glob = from_glob,
   to_bool = to_bool,

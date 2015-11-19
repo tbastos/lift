@@ -94,19 +94,22 @@ describe('Module lift.string', function()
     assert.Nil(str.format_flat_table{1, {}})
   end)
 
-  it("offers format()", function()
+  it("offers format_table() and format()", function()
     local t = {true, [3]=3, ['2']=2, [4]=4, nested = {x = 1, y = 2, z = 3}}
-    assert.equal([[{
+    local expected = [[{
   [1] = true,
   [3] = 3,
   [4] = 4,
   ["2"] = 2,
   nested = {x = 1, y = 2, z = 3},
-}]], str.format(t))
+}]]
+    assert.equal(expected, str.format_table(t))
+    assert.equal(expected, str.format(t))
 
     -- create cycles
     t.to_root = t
     t.nested.to_nested = t.nested
+    setmetatable(t, {__tostring = function() return 'metamethod' end})
     assert.equal([[{
   [1] = true,
   [3] = 3,
@@ -119,6 +122,7 @@ describe('Module lift.string', function()
     z = 3,
   },
   to_root = @,
-}]], str.format(t))
+}]], str.format_table(t))
+    assert.equal('metamethod', str.format(t))
   end)
 end)
