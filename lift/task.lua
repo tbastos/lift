@@ -11,7 +11,7 @@ local tbl_concat, tbl_sort = table.concat, table.sort
 local lstr_format = require('lift.string').format
 
 ------------------------------------------------------------------------------
--- Call Set object (callable set of tasks)
+-- CallSet object (callable set of tasks)
 ------------------------------------------------------------------------------
 
 local CallSet = {}
@@ -38,17 +38,22 @@ end
 ------------------------------------------------------------------------------
 
 local Task = {
-  name = '?'
+  name = '?',
 }
 
 Task.__index = Task
 
-function Task.__call(task, arg1, ...)
+function Task.__call(task, arg, extra)
+  if task.res[arg or 1] then return end
+  -- check if the task was called correctly
   local group = task.group
-  if arg1 == group then
+  if arg == group then
     error('tasks must be called as .functions() not :methods()', 2)
   end
-  return task.f(group, arg1, ...)
+  if extra ~= nil then error('tasks can only take one argument', 2) end
+  -- call the function and save the results
+  task.f(group, arg)
+  task.res[arg or 1] = true
 end
 
 function Task.__add(a, b)
@@ -90,7 +95,7 @@ end
 
 local function new_task(group, name, f)
   validate_name(name) ; validate_f(f)
-  return setmetatable({group = group, name = name, f = f}, Task)
+  return setmetatable({group = group, name = name, f = f, res = {false}}, Task)
 end
 
 ------------------------------------------------------------------------------

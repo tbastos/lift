@@ -1,4 +1,4 @@
-describe("Module lift.task", function()
+describe("A lift.task", function()
 
   local task = require 'lift.task'
   local diagnostics = require 'lift.diagnostics'
@@ -38,20 +38,16 @@ describe("Module lift.task", function()
     end)
 
     it("allows definition of tasks as method declarations", function()
-      function task:task1() return 1 end
-      function task:task2(arg) return arg end
+      function task:task1() end
+      function task:task2() end
       local subgroup = task:group 'task1'
-      function subgroup:task1() return 100 end
+      function subgroup:task1() end
+      -- task properties
       assert.equal('table', type(task.task1), type(subgroup.task1))
       assert.equal('task2', task.task2.name)
       assert.equal(task, task.task2.group)
       assert.equal(subgroup, subgroup.task1.group)
       assert.equal(':task1', tostring(task.task1))
-      assert.equal(1, task.task1())
-      assert.equal(42, task.task2(42))
-      assert.error_matches(function() task:task2(42) end,
-        "tasks must be called as %.functions%(%) not :methods%(%)")
-      assert.equal(100, subgroup.task1())
       if _ENV then -- Lua 5.2+
         assert.error_matches(function() function task.func() end end,
           "tasks must be declared as :methods%(%) not %.functions%(%)")
@@ -67,6 +63,31 @@ describe("Module lift.task", function()
         'expected a task name, got "a:b"')
       assert.error_matches(function() task['a b'] = function(self)end end,
         'expected a task name, got "a b"')
+    end)
+
+  end)
+
+  describe("tasks", function()
+
+    it("can be called as normal functions with a single arg", function()
+      local v = 0
+      function task:add_two() v = v + 2 end
+      function task:add_arg(arg) v = v + arg end
+      task.add_two()
+      assert.equal(2, v)
+      task.add_two()
+      assert.equal(2, v)
+      v = 0
+      task.add_arg(3)
+      assert.equal(3, v)
+      task.add_arg(2)
+      assert.equal(5, v)
+      task.add_arg(2)
+      assert.equal(5, v)
+      assert.error_matches(function() task:add_two() end,
+        "tasks must be called as %.functions%(%) not :methods%(%)")
+      assert.error_matches(function() task.add_arg(4, 2) end,
+        "tasks can only take one argument")
     end)
 
   end)

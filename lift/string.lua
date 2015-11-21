@@ -105,7 +105,7 @@ end
 -- String Formatting
 ------------------------------------------------------------------------------
 
--- Formats an elementary value into a string.
+-- Pretty formats an elementary value into a string.
 local function format_value(v, tp)
   if (tp or type(v)) == 'string' then
     return str_format('%q', v)
@@ -114,7 +114,7 @@ local function format_value(v, tp)
   end
 end
 
--- Formats a value into a string for indexing a table.
+-- Pretty formats a value into a string for indexing a table.
 local function format_key(v)
   local tp = type(v)
   if tp == 'string' and str_find(v, '^[%a_][%w_]*$') then
@@ -123,7 +123,7 @@ local function format_key(v)
   return '['..format_value(v, tp)..']'
 end
 
--- Formats a flat list of values into a string.
+-- Pretty formats a flat list of values into a string.
 -- Returns nil if the list contains nested tables, or if the resulting
 -- string would be longer than max_len (optional).
 local function format_flat_list(t, max_len)
@@ -139,7 +139,7 @@ local function format_flat_list(t, max_len)
   return str
 end
 
--- Formats a flat table into a string.
+-- Pretty formats a flat table into a string.
 -- Returns nil if `t` contains nested tables, or if the resulting
 -- string would be longer than max_width (optional).
 local function format_flat_table(t, max_len, keys)
@@ -150,14 +150,19 @@ local function format_flat_table(t, max_len, keys)
     local v = t[k]
     local tp = type(v)
     if tp == 'table' then return end -- oops, not flat!
-    str = str..sep..format_key(k)..' = '..format_value(v, tp)
+    local vs = format_value(v, tp)
+    if k == i then
+      str = str..sep..vs
+    else
+      str = str..sep..format_key(k)..' = '..vs
+    end
     if max_len and #str > max_len then return end -- too long
     sep = ', '
   end
   return str
 end
 
--- Formats any variable into a string buffer. Handles tables and cycles.
+-- Pretty formats any variable into a string buffer. Handles tables and cycles.
 local function sb_format(sb, name, t, indent, max_len)
   -- handle plain values
   local tp = type(t)
@@ -199,7 +204,7 @@ local function sb_format(sb, name, t, indent, max_len)
   sb[#sb+1] = '}'
 end
 
--- Formats any variable into a string. Handles tables and cycles.
+-- Pretty formats any variable into a string. Handles tables and cycles.
 -- Treats objects with the __tostring metamethod as regular tables.
 local function format_table(value, max_len)
   local sb = {}
@@ -207,8 +212,8 @@ local function format_table(value, max_len)
   return tbl_concat(sb)
 end
 
--- Formats any variable into a string. Handles objects, tables and cycles.
--- Uses the __tostring metamethod for objects that implement it.
+-- Pretty formats any variable into a string. Handles objects, tables and cycles.
+-- Uses the __tostring metamethod to format objects that implement it.
 local function format(value, max_len)
   local mt = getmetatable(value)
   if mt and mt.__tostring then return tostring(value) end

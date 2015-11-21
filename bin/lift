@@ -8,8 +8,10 @@ local loader = require 'lift.loader'
 local diagnostics = require 'lift.diagnostics'
 
 local app = cli.new()
+
+-- root command (invokes a set of tasks)
 function app:run()
-  -- TODO
+  local task_name = 'default'
   self:consume('command')
 end
 

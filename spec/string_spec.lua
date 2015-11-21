@@ -89,7 +89,8 @@ describe('Module lift.string', function()
   end)
 
   it("offers format_flat_table()", function()
-    assert.equal('[true] = 3, x = 1, y = 2', str.format_flat_table{x = 1, [true] = 3, y = 2})
+    assert.equal('"a1", "a2", x = 1, y = 2, [true] = 3',
+      str.format_flat_table{'a1', 'a2', x = 1, [true] = 3, y = 2})
     assert.Nil(str.format_flat_table({x = 'tooooo loooooong'}, 10))
     assert.Nil(str.format_flat_table{1, {}})
   end)

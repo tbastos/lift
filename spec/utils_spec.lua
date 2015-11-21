@@ -15,7 +15,7 @@ describe("Module lift.utils", function()
   end)
 
   it("offers keys_sorted_by_type()", function()
-    assert.same({true, 1, 2, 'a', 'b'},
-      utils.keys_sorted_by_type{1, 2, a = 1, b = 2, [true] = 3})
+    assert.same({1, 2, 'a', 'b', true},
+      utils.keys_sorted_by_type{b = 2, 1, 2, [true] = 3, a = 1})
   end)
 end)

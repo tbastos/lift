@@ -128,7 +128,7 @@ local function _consume(self, args, used, name, ...)
   return args[used], _consume(self, args, used, ...)
 end
 
--- Usage: local a1, a2 = self:consume('<arg1>', '<arg2>')
+-- Usage: local a1, a2 = self:consume('arg1', 'arg2')
 function Command:consume(...)
   local args = assert(self.args, 'command was not called properly')
   local used = args.used ; if not used then used, args.used = 0, 0 end

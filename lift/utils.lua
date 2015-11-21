@@ -9,9 +9,19 @@ local function compare_as_string(a, b)
   return tostring(a) < tostring(b)
 end
 
+local type_order = {
+  number = 1,
+  string = 2,
+  boolean = 3,
+  ['function'] = 4,
+  userdata = 5,
+  thread = 6,
+  table = 7
+}
+
 local function compare_by_type(a, b)
   local ta, tb = type(a), type(b)
-  return ta == tb and a < b or ta < tb
+  return ta == tb and a < b or type_order[ta] < type_order[tb]
 end
 
 -- Returns a list of the keys from table t sorted according to compare.
