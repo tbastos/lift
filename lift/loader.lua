@@ -84,8 +84,8 @@ local function _load_all(type, subtype, ...)
 end
 
 local function load_all(type, subtype, ...)
-  local sub = subtype and ' ('..subtype..')' or ''
-  diagnostics.trace('Loading '..type..sub..' scripts',
+  local substr = subtype and ' ('..subtype..')' or ''
+  diagnostics.trace('Running '..type..substr..' scripts',
     _load_all, type, subtype, ...)
 end
 
@@ -102,24 +102,22 @@ end
 -- then local filesystem (project) configs.
 local function init()
   diagnostics.set_tracing(config:get_bool('tracing'))
-
-  -- load built-in init script
-  local builtin_files = config.LIFT_SRC_DIR..'/files'
-  local top_scope = _init(builtin_files..'/init.lua')
-
-  -- load remaining init scripts in load_path
-  for script in find_scripts('init', nil, true) do
-    _init(script)
-  end
-
-  -- run project_file if available
-  if config.project_file then
-    _init(config.project_file)
-  end
-
-  -- add built-in files to the load_path
-  config:insert_unique('load_path', builtin_files)
-
+  local top_scope
+  diagnostics.trace('Running init scripts', function()
+    -- run built-in init script
+    local builtin_files = config.LIFT_SRC_DIR..'/files'
+    top_scope = _init(builtin_files..'/init.lua')
+    -- run init scripts in ${load_path}
+    for script in find_scripts('init', nil, true) do
+      _init(script)
+    end
+    -- run ${project_file} if available
+    if config.project_file then
+      _init(config.project_file)
+    end
+    -- add built-in files to the ${load_path}
+    config:insert_unique('load_path', builtin_files)
+  end)
   return top_scope
 end
 

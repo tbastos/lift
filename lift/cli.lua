@@ -146,11 +146,11 @@ function Command:error(msg, ...)
   diagnostics.report{command = self, 'cli_error: '..msg, ...}
 end
 
--- Parses key=value config settings and removes them from args.
+-- Parses key=value config settings at the beginning of the args list.
 local function parse_config(args)
   assert(type(args) == 'table', 'missing args')
   local n, size = 1, #args
-  while n < size do
+  while n <= size do
     local s = args[n]
     if s:sub(1, 1) == '-' then break end
     local _, e, key = s:find('^([^=]+)=')
@@ -158,14 +158,7 @@ local function parse_config(args)
     config[key] = s:sub(e + 1)
     n = n + 1
   end
-  n = n - 1
-  if n > 0 then
-    -- shift remaining args
-    for i = 1, size do
-      args[i] = args[i + n]
-    end
-  end
-  return n
+  return n - 1
 end
 
 local function process_option(option, value, next_arg)
@@ -186,44 +179,46 @@ end
 
 -- Processes options, matches args to (sub)command and invokes (sub)command.
 function Command:process(args)
-  assert(type(args) == 'table', 'missing args')
-  assert(self.parent == nil, 'not a root command')
-  local opts, cmd_args, num_args, i, last = true, {}, 0, 1, #args
-  while i <= last do
-    local s, _, e, dash, key, op = args[i]
-    if opts then _, e, dash, key, op = s:find('^(%-*)([^=]+)(=?)') end
-    if not e or (dash == '' and op == '') then -- command arg
-      local subcmd ; if num_args == 0 then subcmd = self.commands[s] end
-      if subcmd then self = subcmd -- use subcommand instead
-      else num_args = num_args + 1 ; cmd_args[num_args] = s end
-    elseif s == '--' then opts = false  -- stop processing options
-    else -- option or config
-      local value ; if op ~= '' then value = s:sub(e + 1) end
-      if dash == '' and op ~= '' then -- config setting
-        config[key] = value
-      else -- option
-        -- match option to a command
-        local opt_cmd, option = self
-        repeat
-          option = opt_cmd.options[key]
-          if option then break end
-          opt_cmd = opt_cmd.parent
-        until not opt_cmd
-        if not option then
-          local msg = "unknown option ${1} for command '${2}'"
-          if not self.parent then msg = 'unknown option ${1}' end
-          self:error(msg, dash..key, self.name)
+  diagnostics.trace('Processing cli args ${args}', function()
+    assert(type(args) == 'table', 'missing args')
+    assert(self.parent == nil, 'not a root command')
+    local opts, cmd_args, num_args, i, last = true, {}, 0, 1, #args
+    while i <= last do
+      local s, _, e, dash, key, op = args[i]
+      if opts then _, e, dash, key, op = s:find('^(%-*)([^=]+)(=?)') end
+      if not e or (dash == '' and op == '') then -- command arg
+        local subcmd ; if num_args == 0 then subcmd = self.commands[s] end
+        if subcmd then self = subcmd -- use subcommand instead
+        else num_args = num_args + 1 ; cmd_args[num_args] = s end
+      elseif s == '--' then opts = false  -- stop processing options
+      else -- option or config
+        local value ; if op ~= '' then value = s:sub(e + 1) end
+        if dash == '' and op ~= '' then -- config setting
+          config[key] = value
+        else -- option
+          -- match option to a command
+          local opt_cmd, option = self
+          repeat
+            option = opt_cmd.options[key]
+            if option then break end
+            opt_cmd = opt_cmd.parent
+          until not opt_cmd
+          if not option then
+            local msg = "unknown option ${1} for command '${2}'"
+            if not self.parent then msg = 'unknown option ${1}' end
+            self:error(msg, dash..key, self.name)
+          end
+          local used, err = process_option(option, value, args[i + 1])
+          if err then opt_cmd:error('option ${1}: ${2}', dash..key, err)
+          elseif used then i = i + 1 end
         end
-        local used, err = process_option(option, value, args[i + 1])
-        if err then opt_cmd:error('option ${1}: ${2}', dash..key, err)
-        elseif used then i = i + 1 end
       end
+      i = i + 1
     end
-    i = i + 1
-  end
-  cmd_args[0] = self.name
-  self:matched(cmd_args)
-  self()
+    cmd_args[0] = self.name
+    self:matched(cmd_args)
+    self()
+  end)
 end
 
 ------------------------------------------------------------------------------

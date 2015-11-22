@@ -21,8 +21,6 @@ describe('Module lift.cli', function()
     assert.Nil(config.bar)
     local args = {'foo=hello', 'bar=world', '--opt', 'oops=1'}
     assert.equal(2, cli.parse_config(args))
-    assert.equal(2, #args)
-    assert.same({'--opt', 'oops=1'}, args)
     assert.equal('hello', config.foo)
     assert.equal('world', config.bar)
     assert.Nil(config.oops)

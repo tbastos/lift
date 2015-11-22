@@ -3,6 +3,7 @@
 --collectgarbage('stop') -- disable GC by default
 
 local cli = require 'lift.cli'
+local task = require 'lift.task'
 local config = require 'lift.config'
 local loader = require 'lift.loader'
 local diagnostics = require 'lift.diagnostics'
@@ -11,8 +12,14 @@ local app = cli.new()
 
 -- root command (invokes a set of tasks)
 function app:run()
-  local task_name = 'default'
-  self:consume('command')
+  local task_set = task{}
+  for i, name in ipairs(self.args) do
+    task_set[i] = task:get_task(name)
+  end
+  if #task_set == 0 then
+    task_set[1] = task:get_task('default')
+  end
+  task_set()
 end
 
 local ok = diagnostics.wrap(function()

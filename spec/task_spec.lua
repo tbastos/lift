@@ -21,33 +21,32 @@ describe("A lift.task", function()
       local child1 = root:group('child1')
       assert.equal('child1', child1.name)
       assert.equal(root, child1.parent)
-      assert.equal(child1, root.children[1])
+      assert.equal(child1, root.child1)
       assert.equal('child1', tostring(child1))
 
       local grandchild1 = child1:group('grandchild1')
       assert.equal('grandchild1', grandchild1.name)
       assert.equal(child1, grandchild1.parent)
-      assert.equal(grandchild1, child1.children[1])
+      assert.equal(grandchild1, child1.grandchild1)
       assert.equal('child1.grandchild1', tostring(grandchild1))
 
       local child2 = root:group('child2')
       assert.equal('child2', child2.name)
       assert.equal(root, child2.parent)
-      assert.equal(child2, root.children[2])
+      assert.equal(child2, root.child2)
       assert.equal('child2', tostring(child2))
     end)
 
     it("allows definition of tasks as method declarations", function()
       function task:task1() end
       function task:task2() end
-      local subgroup = task:group 'task1'
+      local subgroup = task:group 'subgroup'
       function subgroup:task1() end
-      -- task properties
       assert.equal('table', type(task.task1), type(subgroup.task1))
       assert.equal('task2', task.task2.name)
       assert.equal(task, task.task2.group)
       assert.equal(subgroup, subgroup.task1.group)
-      assert.equal(':task1', tostring(task.task1))
+      assert.equal('subgroup:task1', tostring(task.subgroup.task1))
       if _ENV then -- Lua 5.2+
         assert.error_matches(function() function task.func() end end,
           "tasks must be declared as :methods%(%) not %.functions%(%)")
@@ -65,9 +64,28 @@ describe("A lift.task", function()
         'expected a task name, got "a b"')
     end)
 
+    it("can find subgroups and tasks", function()
+      function task:t1() end
+      local child = task:group 'child'
+      function child:t2() end
+      local grandchild = child:group 'grandchild'
+      function grandchild:t3() end
+      assert.equal(child, task:get_group'child')
+      assert.equal(grandchild, task:get_group'child.grandchild')
+      assert.error_matches(function() task:get_group'grandchild' end,
+        "no such group '.grandchild'")
+      assert.error_matches(function() task:get_group'child.grandchild.ggc' end,
+        "no such group 'child.grandchild.ggc'")
+      assert.equal(task.t1, task:get_task't1', task:get_task'.t1')
+      assert.equal(child.t2, task:get_task'child.t2', task:get_task'child:t2')
+      assert.equal(grandchild.t3, task:get_task'child.grandchild:t3')
+      assert.error_matches(function() task:get_task'child.none' end,
+        "no such task 'child.none'")
+    end)
+
   end)
 
-  describe("tasks", function()
+  describe("task", function()
 
     it("can be called as normal functions with a single arg", function()
       local v = 0
@@ -92,14 +110,32 @@ describe("A lift.task", function()
 
   end)
 
-  describe("call set", function()
+  describe("task set", function()
 
-    it("is defined using task + task (operator +)", function()
+    it("is defined using 'task{t1, t2, ...}'", function()
       function task:t1() end
       function task:t2() end
-      function task:t3() end
-      assert.equal('CallSet(:t1 + :t2)', tostring(task.t1 + task.t2))
-      assert.equal('CallSet(:t1 + :t2 + :t3)', tostring(task.t2 + task.t1 + task.t3))
+      local sub = task:group('sub')
+      function sub:t3() end
+      assert.equal('TaskSet{t1, t2}', tostring(task{task.t1, task.t2}))
+      assert.equal('TaskSet{sub:t3, t1, t2}', tostring(task{task.t2, task.t1, sub.t3}))
+    end)
+
+    it("can be invoked like a task", function()
+      local v = 0
+      function task:add_two() v = v + 2 end
+      function task:add_five() v = v + 5 end
+      function task:add_arg(arg) v = v + arg end
+      task{task.add_two, task.add_five, task.add_arg}(3)
+      assert.equal(10, v)
+      task{task.add_two, task.add_five}()
+      assert.equal(17, v)
+      task{task.add_two, task.add_five}()
+      assert.equal(17, v)
+      task.add_arg(3)
+      assert.equal(17, v)
+      task.add_arg(4)
+      assert.equal(21, v)
     end)
 
   end)

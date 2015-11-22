@@ -6,7 +6,7 @@
 -- integrate one through a diagnostics consumer. The focus here is
 -- on an error handling system well suited to tools and compilers.
 
-local rawget, tostring, type = rawget, tostring, type
+local rawget, type = rawget, type
 local unpack = table.unpack or unpack -- Lua 5.1 compatibility
 local clock = os.clock
 local str_find = string.find
@@ -222,7 +222,7 @@ function Reporter:report(d)
   end
   -- errors may contain an activity trace created by trace()
   if d.activity_trace then
-    stderr:write('\n', ESC'yellow', 'Activity Trace:', ESC'clear', '\n')
+    stderr:write('\n', ESC'yellow', 'Trace:', ESC'clear', '\n')
     for i, msg in ipairs(d.activity_trace) do
       stderr:write((' '):rep(i * 2), msg, '\n')
     end
@@ -242,7 +242,8 @@ local function set_tracing(v) tracing = v end
 local _f ; local function _expander(name)
   for i = 1, 9 do -- limited to the first 9 upvalues
     local n, v = dbg_upvalue(_f, i)
-    if not n then break elseif n == name then return tostring(v) end
+    if not n then break
+    elseif n == name then return lstring.format(v) end
   end
   return nil
 end
@@ -323,7 +324,7 @@ local function wrap(f)
       mem = mem / 1024
       fmt = 'time %.2fs, memory %.2fM'
     end
-    stderr:write(ESC'cyan', '\nTotal ', fmt:format(dt, mem), ESC'clear', '\n' )
+    stderr:write(ESC'cyan', 'Total ', fmt:format(dt, mem), ESC'clear', '\n' )
   end
   return ok, diag
 end

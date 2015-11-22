@@ -110,7 +110,6 @@ describe('Module lift.diagnostics', function()
 tracing!
 dummy%.lua:1:5: error: zomg!
   Elapsed time .*s
-
 Total time .*, memory .*]], out)
   end)
 

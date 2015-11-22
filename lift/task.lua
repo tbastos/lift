@@ -2,35 +2,33 @@
 -- Task Engine
 ------------------------------------------------------------------------------
 
-local assert, pairs, tostring, type = assert, pairs, tostring, type
+local tostring, type = tostring, type
 local getmetatable, setmetatable = getmetatable, setmetatable
-local str_find = string.find
+local str_find, str_gmatch, str_match = string.find, string.gmatch, string.match
 local tbl_concat, tbl_sort = table.concat, table.sort
 
--- local diagnostics = require 'lift.diagnostics'
+local diagnostics = require 'lift.diagnostics'
 local lstr_format = require('lift.string').format
 
 ------------------------------------------------------------------------------
--- CallSet object (callable set of tasks)
+-- TaskSet object (callable set of tasks)
 ------------------------------------------------------------------------------
 
-local CallSet = {}
+local TaskSet = {}
 
-function CallSet.__call(cs, ...)
-  assert(false) -- TODO
+function TaskSet.__call(cs, ...)
+  for i = 1, #cs do
+    cs[i](...)
+  end
 end
 
-function CallSet.__tostring(cs)
+function TaskSet.__tostring(cs)
   local t = {}
-  for task, _ in pairs(cs) do
-    t[#t+1] = tostring(task)
+  for i = 1, #cs do
+    t[i] = tostring(cs[i])
   end
   tbl_sort(t)
-  return 'CallSet('..tbl_concat(t, ' + ')..')'
-end
-
-local function new_callset(t1, t2)
-  return setmetatable({[t1] = true, [t2] = true}, CallSet)
+  return 'TaskSet{'..tbl_concat(t, ', ')..'}'
 end
 
 ------------------------------------------------------------------------------
@@ -56,22 +54,9 @@ function Task.__call(task, arg, extra)
   task.res[arg or 1] = true
 end
 
-function Task.__add(a, b)
-  local ma, mb = getmetatable(a), getmetatable(b)
-  if ma == Task and mb == Task then
-    return new_callset(a, b)
-  elseif mb == Task then
-    assert(ma == CallSet)
-  else
-    assert(mb == CallSet)
-    a, b = b, a
-  end
-  a[b] = true
-  return a
-end
-
 function Task.__tostring(task)
-  return tostring(task.group)..':'..task.name
+  local prefix = tostring(task.group)
+  return prefix..(prefix == '' and '' or ':')..task.name
 end
 
 local function validate_name(name)
@@ -115,6 +100,25 @@ local function new_group(name, parent)
     tasks = {}, children = {}, requires = {}}, Group)
 end
 
+function Group.__index(t, k)
+  return t.tasks[k] or Group[k] or t.children[k]
+end
+
+function Group.__newindex(t, k, v)
+  t.tasks[k] = new_task(t, k, v)
+end
+
+function Group.__call(group, t)
+  local tp = type(t)
+  if tp ~= 'table' then error('expected a table, got '..tp, 2) end
+  for i = 1, #t do
+    if getmetatable(t[i]) ~= Task then
+      error('element #'..i..' is not a Task, but a '..type(t[i]))
+    end
+  end
+  return setmetatable(t, TaskSet)
+end
+
 function Group.__tostring(group)
   local parent = group.parent
   if not parent then return group.name end
@@ -122,19 +126,32 @@ function Group.__tostring(group)
   return tostring(parent)..'.'..group.name
 end
 
-function Group.__index(t, k)
-  return t.tasks[k] or Group[k]
-end
-
-function Group.__newindex(t, k, v)
-  t.tasks[k] = new_task(t, k, v)
-end
-
 function Group:group(name)
   validate_name(name)
-  local child, list = new_group(name, self), self.children
-  list[#list+1] = child
+  local child = new_group(name, self)
+  self.children[name] = child
   return child
+end
+
+function Group:get_group(name)
+  local g = self
+  for s in str_gmatch(name, '([^.:]+)[.:]*') do
+    local child = g.children[s]
+    if not child then
+      diagnostics.report("fatal: no such group '"..tostring(g)..'.'..s.."'")
+    end
+    g = child
+  end
+  return g
+end
+
+function Group:get_task(name)
+  local gn, tn = str_match(name, '^(.-)[.:]*([^.:]+)$')
+  local task = self:get_group(gn).tasks[tn]
+  if not task then
+    diagnostics.report("fatal: no such task '"..name.."'")
+  end
+  return task
 end
 
 function Group:reset(args)
