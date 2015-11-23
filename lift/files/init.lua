@@ -37,7 +37,7 @@ end
 -- Detect project_file and project_dir
 ------------------------------------------------------------------------------
 
-do
+(function()
   local dir = config.cwd
   repeat
     for i, name in ipairs(config.project_file_names) do
@@ -45,16 +45,16 @@ do
       if path.is_file(file) then
         config.project_file = file
         config.project_dir = dir
-        break
+        return
       end
     end
     if path.is_dir(dir..'/'..config.project_files_dir_name) then
       config.project_dir = dir
-      break
+      return
     end
     dir = path.dir(dir)
   until #dir <= 1 or path.is_root(dir)
-end
+end)()
 
 ------------------------------------------------------------------------------
 -- Portable Directory Paths: {system,user}_{config,data}_dir and cache_dir

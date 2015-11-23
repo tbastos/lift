@@ -1,5 +1,6 @@
 describe("Module lift.loader", function()
 
+  local path = require 'lift.path'
   local loader = require 'lift.loader'
   local config = require 'lift.config'
   local diagnostics = require 'lift.diagnostics'
@@ -31,17 +32,17 @@ describe("Module lift.loader", function()
   end)
 
   describe("init()", function()
+    local spec_dir = path.clean(config.LIFT_SRC_DIR..'/../spec')
 
     it('runs init scripts ir the order listed in the ${load_path}', function()
       assert.Nil(config.pi)
-      assert.Nil(config.cwd)
+      config.cwd = spec_dir..'/files'
       config.load_path = 'spec/files'
       config.user_config_dir = 'spec/files/user'
       config.system_config_dir = 'spec/files/system'
       loader.init()
-      assert.not_nil(config.cwd)
-      assert.Nil(config.project_dir)
-      assert.Nil(config.project_file)
+      assert.equal(spec_dir, config.project_dir)
+      assert.equal(spec_dir..'/Liftfile.lua', config.project_file)
       assert.equal(config.APP_VERSION, config.LIFT_VERSION)
       assert.equal(3.14, config.pi)
       assert.equal('user', config.opt1)
