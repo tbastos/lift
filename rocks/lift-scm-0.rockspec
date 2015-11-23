@@ -36,6 +36,8 @@ build = {
     ["lift.files.cli"] = "lift/files/cli.lua",
     ["lift.files.cli_config"] = "lift/files/cli_config.lua",
     ["lift.files.init"] = "lift/files/init.lua",
+
+    ["lift.files.lift.cli_task"] = "lift/files/lift/cli_task.lua",
   },
 
   install = {
