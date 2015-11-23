@@ -8,20 +8,6 @@ local config = require 'lift.config'
 local loader = require 'lift.loader'
 local diagnostics = require 'lift.diagnostics'
 
-local app = cli.new()
-
--- root command (invokes a set of tasks)
-function app:run()
-  local task_set = task{}
-  for i, name in ipairs(self.args) do
-    task_set[i] = task:get_task(name)
-  end
-  if #task_set == 0 then
-    task_set[1] = task:get_task('default')
-  end
-  task_set()
-end
-
 local ok = diagnostics.wrap(function()
 
   -- parse key=value configs at the beginning of arg list
@@ -31,6 +17,9 @@ local ok = diagnostics.wrap(function()
   -- run init scripts
   local top_scope = loader.init()
 
+  -- add files specific to the 'lift' executable to the ${load_path}
+  config:insert_unique('load_path', config.LIFT_SRC_DIR..'/files/lift')
+
   -- make cli configs override init configs
   assert(top_scope:get_parent() == cli_scope)
   top_scope:set_parent(cli_scope:get_parent())
@@ -38,7 +27,14 @@ local ok = diagnostics.wrap(function()
   config:set_parent(cli_scope)
 
   -- run CLI scripts
+  local app = cli.new()
   loader.load_all('cli', nil, app)
+
+  -- default command is an alias for the 'run' command
+  app:delegate_to(app:get_command('task run'))
+
+  app:command 'list' :delegate_to(app:get_command 'task list')
+    :desc('list [pattern]', 'Show list of tasks (that match a pattern)')
 
   -- process CLI
   app:process(arg)

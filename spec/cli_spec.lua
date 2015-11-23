@@ -169,6 +169,12 @@ describe('Module lift.cli', function()
     local sub3 = sub1:command('sub3'):action(spy) ; sub3:option('o')
     local sub4 = sub3:command('sub4'):action(spy) ; sub4:option('o')
 
+    assert.equal('sub1', root:get_command('sub1').name)
+    assert.equal('sub1 sub3', root:get_command('sub1 sub3').name)
+    assert.equal('sub1 sub3 sub4', root:get_command('sub1 sub3 sub4').name)
+    assert.error_matches(function() root:get_command('sub1 nope') end,
+      "no such command 'sub1 nope'")
+
     root:process{'x', 'sub1', '-o=1'}
     assert.equal('', called) ; assert.equal(2, #with)
 

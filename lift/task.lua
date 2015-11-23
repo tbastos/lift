@@ -4,6 +4,7 @@
 
 local tostring, type = tostring, type
 local getmetatable, setmetatable = getmetatable, setmetatable
+local unpack = table.unpack or unpack -- Lua 5.1 compatibility
 local str_find, str_gmatch, str_match = string.find, string.gmatch, string.match
 local tbl_concat, tbl_sort = table.concat, table.sort
 
@@ -28,7 +29,7 @@ function TaskSet.__tostring(cs)
     t[i] = tostring(cs[i])
   end
   tbl_sort(t)
-  return 'TaskSet{'..tbl_concat(t, ', ')..'}'
+  return 'task{'..tbl_concat(t, ', ')..'}'
 end
 
 ------------------------------------------------------------------------------
@@ -42,21 +43,28 @@ local Task = {
 Task.__index = Task
 
 function Task.__call(task, arg, extra)
-  if task.res[arg or 1] then return end
-  -- check if the task was called correctly
-  local group = task.group
-  if arg == group then
-    error('tasks must be called as .functions() not :methods()', 2)
+  local res = task.res[arg or 1]
+  if not res then
+    -- check if the task was called correctly
+    local group = task.group
+    if arg == group then
+      error('tasks must be called as .functions() not :methods()', 2)
+    end
+    if extra ~= nil then error('tasks can only take one argument', 2) end
+    -- call the function and save the results
+    res = {task.f(group, arg)}
+    task.res[arg or 1] = res
   end
-  if extra ~= nil then error('tasks can only take one argument', 2) end
-  -- call the function and save the results
-  task.f(group, arg)
-  task.res[arg or 1] = true
+  return unpack(res)
 end
 
 function Task.__tostring(task)
   local prefix = tostring(task.group)
   return prefix..(prefix == '' and '' or ':')..task.name
+end
+
+function Task:get_result_for(arg)
+  return self.res[arg or 1]
 end
 
 local function validate_name(name)
@@ -159,53 +167,6 @@ function Group:reset(args)
   self.children = {}
   self.requires = {}
 end
-
-------------------------------------------------------------------------------
--- Execute a DAG of groups in topological order (i.e. resolving dependencies)
-------------------------------------------------------------------------------
-
---[[
-local function toposort(res, marks, node)
-  local mark = marks[node]
-  if mark == 'done' then return end
-  if mark == 'cycle' then
-    local cycle = {}
-    for i = 1, #marks do
-      if marks[i] == node then
-        for j = i, #marks do cycle[#cycle + 1] = marks[j].name end
-        cycle[#cycle + 1] = node.name
-        break
-      end
-    end
-    diagnostics.report("fatal: group graph contains a cycle: ${1}",
-        "'" .. table.concat(cycle, "' -> '") .. "'")
-  else
-    new_group(node)
-    marks[node] = 'cycle'
-    marks[#marks + 1] = node
-    for i, n in ipairs(node.requires) do toposort(res, marks, n) end
-    marks[#marks] = nil
-    marks[node] = 'done'
-    res[#res + 1] = node
-  end
-end
-
--- invokes group[task](group, ...) on the whole DAG, in topological order
-local function execute(root_group, action, ...)
-  assert(#Group.requires == 0, 'the default Group.requires was modified')
-  local list = {} toposort(list, {}, root_group)
-  for i, group in ipairs(list) do
-    local f = group[action]
-    if f then
-      f(group, ...)
-      diagnostics.fail_if_error()
-    else
-      diagnostics.report("fatal: group '${1}' does not support action '${2}'",
-        group.name, tostring(action))
-    end
-  end
-end
-]]
 
 -- return root task group
 return new_group('')

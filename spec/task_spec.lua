@@ -64,7 +64,7 @@ describe("A lift.task", function()
         'expected a task name, got "a b"')
     end)
 
-    it("can find subgroups and tasks", function()
+    it("can get subgroups and tasks by name", function()
       function task:t1() end
       local child = task:group 'child'
       function child:t2() end
@@ -108,6 +108,21 @@ describe("A lift.task", function()
         "tasks can only take one argument")
     end)
 
+    it("can return multiple values", function()
+      function task:nums() return 1, 2, 3 end
+      function task:args(a) return a[1], a[2], a[3] end
+      local r1, r2, r3, r4 = task.nums()
+      assert.equal(1, r1)
+      assert.equal(2, r2)
+      assert.equal(3, r3)
+      assert.Nil(r4)
+      r1, r2, r3, r4 = task.args{'x', 'y'}
+      assert.equal('x', r1)
+      assert.equal('y', r2)
+      assert.Nil(r3)
+      assert.Nil(r4)
+    end)
+
   end)
 
   describe("task set", function()
@@ -117,8 +132,8 @@ describe("A lift.task", function()
       function task:t2() end
       local sub = task:group('sub')
       function sub:t3() end
-      assert.equal('TaskSet{t1, t2}', tostring(task{task.t1, task.t2}))
-      assert.equal('TaskSet{sub:t3, t1, t2}', tostring(task{task.t2, task.t1, sub.t3}))
+      assert.equal('task{t1, t2}', tostring(task{task.t1, task.t2}))
+      assert.equal('task{sub:t3, t1, t2}', tostring(task{task.t2, task.t1, sub.t3}))
     end)
 
     it("can be invoked like a task", function()
@@ -139,44 +154,5 @@ describe("A lift.task", function()
     end)
 
   end)
-
-  --[[
-  describe('when executing a DAG of tasks', function()
-
-    -- aux method added to all tasks
-    -- function task.Task:addOwnName(t) t[#t + 1] = self.name end
-
-    it('should invoke methods in topo-sorted order', function()
-      local a = { name = 'a' }
-      local c = { name = 'c' } a.requires = { c }
-      local b = { name = 'b', requires = { c } }
-      local d = { name = 'd', requires = { a, b }}
-      local root = { name = 'root', requires = { a, b, c, d } }
-      local t = {} task.execute(root, 'addOwnName', t)
-      assert.equal('c, a, b, d, root', table.concat(t, ', '))
-    end)
-
-    it('should detect cycles', function()
-      local a = { name = 'a' }
-      local b = { name = 'b' }
-      local c = { name = 'c' } b.requires = { a, c }
-      local d = { name = 'd' } c.requires = { d } d.requires = { b }
-      local root = { name = 'root', requires = { a, b, c, d } }
-      local ok, diag = pcall(task.execute, root, 'addOwnName', {})
-      assert.False(ok)
-      assert.equal("'b' -> 'c' -> 'd' -> 'b'", diag[1])
-    end)
-
-    it('should detect missing methods', function()
-      local a = { name = 'a', method = function() end }
-      local b = { name = 'b', method = function() end }
-      local c = { name = 'c' }
-      local root = { name = 'root', requires = { a, b, c } }
-      assert.error(function() task.execute(root, 'method') end,
-        "task 'c' does not support action 'method'")
-    end)
-
-  end)
-  ]]
 
 end)

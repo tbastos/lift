@@ -73,6 +73,10 @@ function Command:__call()
   end
 end
 
+function Command:__tostring()
+  return self.name
+end
+
 -- the default action for all commands is to print help and exit
 local function help(cmd)
   io.write(unpack(cmd:get_help()))
@@ -90,6 +94,18 @@ function Command:get(option_name)
 end
 function Command:alias(alias)
   return self.parent:add_command(alias, self)
+end
+local function delegate(delegator)
+  local delegatee = assert(delegator.delegatee)
+  delegatee.args = delegator.args
+  return delegatee()
+end
+function Command:delegate_to(other_command)
+  if getmetatable(other_command) ~= Command then
+    error('expected a command object, got'..tostring(other_command), 2)
+  end
+  self.delegatee = other_command
+  return self:action(delegate)
 end
 function Command:add_option(name, option) -- adds an existing option
   if self.options[name] then
@@ -115,6 +131,17 @@ end
 function Command:command(name) -- defines a new subcommand
   assert(type(name) == 'string' and #name > 0)
   return self:add_command(name, new_cmd(self, name))
+end
+function Command:get_command(name)
+  local cmd = self
+  for s in name:gmatch('([^ ]+)[ ]*') do
+    local child = cmd.commands[s]
+    if not child then
+      error("no such command '"..tostring(cmd)..' '..s.."'", 2)
+    end
+    cmd = child
+  end
+  return cmd
 end
 
 ------------------------------------------------------------------------------
