@@ -16,7 +16,7 @@ platform:
   - x64
 
 configuration:
-  - 2015
+  - Release
 
 matrix:
   fast_finish: true
@@ -30,7 +30,8 @@ install:
   - call .ci\install.bat
   - set LIBUV_VERSION=1.7.5
   - appveyor DownloadFile https://github.com/libuv/libuv/archive/v%LIBUV_VERSION%.zip
-  - 7z x v%LIBUV_VERSION%.zip & cd libuv-%LIBUV_VERSION% & vcbuild.bat %Platform% shared release
+  - set ARCH=%platform%
+  - 7z x v%LIBUV_VERSION%.zip & cd libuv-%LIBUV_VERSION% & vcbuild.bat release %ARCH% shared
   - set LIBUV=C:\projects\lift\libuv-%LIBUV_VERSION%
   - set PATH=%PATH%;%LIBUV%
 
