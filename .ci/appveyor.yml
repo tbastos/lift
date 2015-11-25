@@ -26,16 +26,13 @@ cache:
   - c:\external -> .ci\appveyor.yml
 
 install:
-  - env
   - call .ci\set_compiler_env.bat
   - call .ci\install.bat
   - appveyor DownloadFile https://github.com/libuv/libuv/archive/v1.7.5.zip
-  - 7z x v1.7.5.zip & cd libuv-1.7.5 & vcbuild.bat %platform% static release
-  - dir libuv-1.7.5
-  - dir libuv-1.7.5\Release
+  - 7z x v1.7.5.zip & cd libuv-1.7.5 & vcbuild.bat %Platform% static release
 
 build_script:
-  - luarocks install lluv UV_DIR=libuv-1.7.5 UV_LIBDIR=libuv-1.7.5\Release
+  - luarocks install lluv UV_DIR=libuv-1.7.5 UV_LIBDIR=libuv-1.7.5\Release\lib
   - luarocks install busted
   - busted -v
   - luarocks make rocks/lift-scm-0.rockspec
