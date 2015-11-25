@@ -33,7 +33,7 @@ install:
   - dir libuv-1.7.5\Release\lib
 
 build_script:
-  - luarocks install lluv UV_DIR=libuv-1.7.5 UV_LIBDIR=libuv-1.7.5\Release\lib
+  - luarocks install lluv UV_DIR=C:\projects\lift\libuv-1.7.5 UV_LIBDIR=C:\projects\lift\libuv-1.7.5\Release\lib
   - luarocks install busted
   - busted -v
   - luarocks make rocks/lift-scm-0.rockspec
