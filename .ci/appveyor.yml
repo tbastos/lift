@@ -34,10 +34,9 @@ install:
   - libuv-%ARCH%-v%LIBUV_VERSION%.build7.exe /NCRC /S
   - if "%ARCH%" EQU "x64" (set LIBUV="%ProgramFiles%\libuv") else (set LIBUV="%ProgramFiles(x86)%\libuv")
   - set PATH=%PATH%;%LIBUV%
-  - dir %LIBUV%
 
 build_script:
-  - luarocks install lluv UV_DIR=%LIBUV%
+  - luarocks install lluv UV_DIR=%LIBUV% UV_LIBDIR=%LIBUV%
   - luarocks install busted
   - busted -v --filter-out=scheduler
   - luarocks make rocks/lift-scm-0.rockspec
