@@ -21,6 +21,8 @@ before_install:
   - source .ci/setenv_lua.sh
   - git clone https://github.com/libuv/libuv && cd libuv && sh autogen.sh && ./configure && make && cd ..
   - ls -la libuv
+  - ls -la libuv/.libs
+  - pwd
 
 before_script:
   - luarocks install lluv UV_DIR=libuv UV_LIBDIR=libuv/.libs
