@@ -26,6 +26,7 @@ cache:
   - c:\external -> .ci\appveyor.yml
 
 install:
+  - env
   - call .ci\set_compiler_env.bat
   - call .ci\install.bat
   - appveyor DownloadFile https://github.com/libuv/libuv/archive/v1.7.5.zip
