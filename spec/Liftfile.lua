@@ -1,0 +1,2 @@
+-- The purpose of this file is to make lift detect this directory
+-- as the ${project_dir} in most tests.

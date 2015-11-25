@@ -1,4 +1,4 @@
-describe('Module lift.config', function()
+describe('lift.config', function()
 
   local config = require 'lift.config'
   local diagnostics = require 'lift.diagnostics'

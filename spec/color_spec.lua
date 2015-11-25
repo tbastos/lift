@@ -1,4 +1,4 @@
-describe('Module lift.color', function()
+describe('lift.color', function()
 
   local color = require 'lift.color'
   after_each(function() color.set_enabled(false) end)

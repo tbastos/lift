@@ -1,4 +1,4 @@
-describe('Module lift.diagnostics', function()
+describe('lift.diagnostics', function()
 
   local diagnostics = require 'lift.diagnostics'
 

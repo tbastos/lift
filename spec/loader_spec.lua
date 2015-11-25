@@ -1,4 +1,4 @@
-describe("Module lift.loader", function()
+describe("lift.loader", function()
 
   local path = require 'lift.path'
   local loader = require 'lift.loader'

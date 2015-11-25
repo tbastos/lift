@@ -1,4 +1,4 @@
-describe('Module lift.cli', function()
+describe('lift.cli', function()
 
   local cli = require 'lift.cli'
   local config = require 'lift.config'

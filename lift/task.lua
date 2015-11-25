@@ -29,7 +29,7 @@ function TaskSet.__tostring(cs)
     t[i] = tostring(cs[i])
   end
   tbl_sort(t)
-  return 'task{'..tbl_concat(t, ', ')..'}'
+  return 'lift.task{'..tbl_concat(t, ', ')..'}'
 end
 
 ------------------------------------------------------------------------------

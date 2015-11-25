@@ -1,4 +1,4 @@
-describe('Module lift.string', function()
+describe('lift.string', function()
 
   local str = require 'lift.string'
 

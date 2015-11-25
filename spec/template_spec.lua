@@ -1,4 +1,4 @@
-describe('Module lift.template', function()
+describe('lift.template', function()
 
   local config = require 'lift.config'
   local template = require 'lift.template'

@@ -13,8 +13,9 @@ description = {
 }
 
 dependencies = {
-  "lua >= 5.1",
+  'lua >= 5.1',
   'lpeg >= 1.0.0',
+  'lluv >= 0.1.3',
   'luafilesystem >= 1.6.3',
 }
 
@@ -28,6 +29,7 @@ build = {
     ["lift.diagnostics"] = "lift/diagnostics.lua",
     ["lift.loader"] = "lift/loader.lua",
     ["lift.path"] = "lift/path.lua",
+    ["lift.scheduler"] = "lift/scheduler.lua",
     ["lift.string"] = "lift/string.lua",
     ["lift.task"] = "lift/task.lua",
     ["lift.template"] = "lift/template.lua",

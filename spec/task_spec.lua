@@ -132,8 +132,8 @@ describe("A lift.task", function()
       function task:t2() end
       local sub = task:group('sub')
       function sub:t3() end
-      assert.equal('task{t1, t2}', tostring(task{task.t1, task.t2}))
-      assert.equal('task{sub:t3, t1, t2}', tostring(task{task.t2, task.t1, sub.t3}))
+      assert.equal('lift.task{t1, t2}', tostring(task{task.t1, task.t2}))
+      assert.equal('lift.task{sub:t3, t1, t2}', tostring(task{task.t2, task.t1, sub.t3}))
     end)
 
     it("can be invoked like a task", function()

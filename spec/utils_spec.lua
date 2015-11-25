@@ -1,4 +1,4 @@
-describe("Module lift.utils", function()
+describe("lift.utils", function()
 
   local utils = require 'lift.utils'
 
