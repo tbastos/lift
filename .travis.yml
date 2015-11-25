@@ -19,10 +19,10 @@ branches:
 
 before_install:
   - source .ci/setenv_lua.sh
-  - git clone https://github.com/libuv/libuv && cd libuv && sh autogen.sh && ./configure && make && make install && cd ..
+  - git clone https://github.com/libuv/libuv && cd libuv && sh autogen.sh && ./configure && make && cd ..
 
 before_script:
-  - luarocks install lluv
+  - luarocks install lluv UV_DIR=libuv UV_LIBDIR=libuv/.libs
   - luarocks install busted
   - luarocks install luacov
   - luarocks install luacov-coveralls
