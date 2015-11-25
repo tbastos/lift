@@ -28,14 +28,14 @@ cache:
 install:
   - call .ci\set_compiler_env.bat
   - call .ci\install.bat
-  - appveyor DownloadFile https://github.com/libuv/libuv/archive/v1.7.5.zip
-  - 7z x v1.7.5.zip & cd libuv-1.7.5 & vcbuild.bat %Platform% shared release
-  - dir libuv-1.7.5\Release
-  - dir libuv-1.7.5\Release\lib
+  - set LIBUV_VERSION=1.7.5
+  - appveyor DownloadFile https://github.com/libuv/libuv/archive/v%LIBUV_VERSION%.zip
+  - 7z x v%LIBUV_VERSION%.zip & cd libuv-%LIBUV_VERSION% & vcbuild.bat %Platform% shared release
+  - set LIBUV=C:\projects\lift\libuv-%LIBUV_VERSION%
+  - set PATH=%PATH%;%LIBUV%
 
 build_script:
-  - set PATH=%PATH%;C:\projects\lift\libuv-1.7.5\Release
-  - luarocks install lluv UV_DIR=C:\projects\lift\libuv-1.7.5 UV_LIBDIR=C:\projects\lift\libuv-1.7.5\Release\lib
+  - luarocks install lluv UV_DIR=%LIBUV% UV_LIBDIR=%LIBUV%\Release
   - luarocks install busted
   - busted -v
   - luarocks make rocks/lift-scm-0.rockspec
