@@ -19,6 +19,7 @@ branches:
 
 before_install:
   - source .ci/setenv_lua.sh
+  - git clone https://github.com/libuv/libuv && cd libuv && sh autogen.sh && ./configure && make && make install && cd ..
 
 before_script:
   - luarocks install lluv
