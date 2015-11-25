@@ -21,6 +21,7 @@ before_install:
   - source .ci/setenv_lua.sh
 
 before_script:
+  - luarocks install lluv
   - luarocks install busted
   - luarocks install luacov
   - luarocks install luacov-coveralls

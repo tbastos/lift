@@ -34,6 +34,7 @@ install:
   - call .ci\install.bat
 
 build_script:
+  - luarocks install lluv
   - luarocks install busted
   - busted -v
   - luarocks make rocks/lift-scm-0.rockspec

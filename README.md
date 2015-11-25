@@ -18,7 +18,7 @@ Lift is both a **task automation tool** and a **framework** for writing command-
 ### Prerequisites
 - **OS:** Linux, OSX or Windows (should work on any POSIX system)
 - **Lua:** 5.1, 5.2 or 5.3 (or a compatible LuaJIT)
-- **Libraries:** [LPeg], [LFS] or [lluv]
+- **Libraries:** [LPeg], [LFS] and [lluv]
  
 ## Installation
 
@@ -42,7 +42,7 @@ The following projects have in some way influenced Lift's design:
 - Configuration: [NPM], [CMake], [Vim]
 - Diagnostics: [Clang]
 - Path API: [Go]
-- Task/build system: [Rake]/[Jake], [Gulp], [Tup]
+- Task/build system: [Rake]/[Jake], [Gulp]
 
 [argparse]: https://github.com/mpeterv/argparse
 [busted]: http://olivinelabs.com/busted
@@ -61,5 +61,4 @@ The following projects have in some way influenced Lift's design:
 [NPM]: https://www.npmjs.org/doc/
 [Rake]: http://en.wikipedia.org/wiki/Rake_(software)
 [Thor]: https://github.com/erikhuda/thor/wiki
-[Tup]: http://gittup.org/tup
 [Vim]: http://en.wikipedia.org/wiki/Vim_(text_editor)
