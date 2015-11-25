@@ -30,6 +30,7 @@ install:
   - call .ci\install.bat
   - appveyor DownloadFile https://github.com/libuv/libuv/archive/v1.7.5.zip
   - 7z x v1.7.5.zip & cd libuv-1.7.5 & vcbuild.bat %Platform% static release
+  - dir libuv-1.7.5\Release\lib
 
 build_script:
   - luarocks install lluv UV_DIR=libuv-1.7.5 UV_LIBDIR=libuv-1.7.5\Release\lib
