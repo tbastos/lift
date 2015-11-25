@@ -29,10 +29,12 @@ install:
   - call .ci\set_compiler_env.bat
   - call .ci\install.bat
   - appveyor DownloadFile https://github.com/libuv/libuv/archive/v1.7.5.zip
-  - 7z x v1.7.5.zip & cd libuv-1.7.5 & vcbuild.bat %Platform% static release
+  - 7z x v1.7.5.zip & cd libuv-1.7.5 & vcbuild.bat %Platform% shared release
+  - dir libuv-1.7.5\Release
   - dir libuv-1.7.5\Release\lib
 
 build_script:
+  - set PATH=%PATH%;C:\projects\lift\libuv-1.7.5\Release
   - luarocks install lluv UV_DIR=C:\projects\lift\libuv-1.7.5 UV_LIBDIR=C:\projects\lift\libuv-1.7.5\Release\lib
   - luarocks install busted
   - busted -v
