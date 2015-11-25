@@ -12,6 +12,7 @@ environment:
   - LJ_VER: 2.1
 
 platform:
+  - x86
   - x64
 
 configuration:
@@ -27,11 +28,13 @@ cache:
 install:
   - call .ci\set_compiler_env.bat
   - call .ci\install.bat
-  - appveyor DownloadFile http://dist.libuv.org/dist/v1.7.5/libuv-x64-v1.7.5.build7.exe
-  - libuv-x64-v1.7.5.build7.exe /NCRC /S
+  - appveyor DownloadFile https://github.com/libuv/libuv/archive/v1.7.5.zip
+  - 7z x v1.7.5.zip & cd libuv-1.7.5 & vcbuild.bat %platform% static release
+  - dir libuv-1.7.5
+  - dir libuv-1.7.5\Release
 
 build_script:
-  - luarocks install lluv UV_DIR="C:/Program Files/libuv" UV_LIBDIR="C:/Program Files/libuv"
+  - luarocks install lluv UV_DIR=libuv-1.7.5 UV_LIBDIR=libuv-1.7.5\Release
   - luarocks install busted
   - busted -v
   - luarocks make rocks/lift-scm-0.rockspec
