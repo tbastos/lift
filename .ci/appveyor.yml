@@ -17,7 +17,6 @@ platform:
 
 configuration:
   - 2015
-  - Release
 
 matrix:
   fast_finish: true
@@ -29,15 +28,15 @@ cache:
 install:
   - call .ci\set_compiler_env.bat
   - call .ci\install.bat
-  - set LIBUV_VERSION=1.7.5
-  - appveyor DownloadFile https://github.com/libuv/libuv/archive/v%LIBUV_VERSION%.zip
   - set ARCH=%platform%
-  - 7z x v%LIBUV_VERSION%.zip & cd libuv-%LIBUV_VERSION% & vcbuild.bat release %ARCH% shared
-  - set LIBUV=%APPVEYOR_BUILD_FOLDER%\libuv-%LIBUV_VERSION%
+  - set LIBUV_VERSION=1.7.5
+  - appveyor DownloadFile http://dist.libuv.org/dist/v%LIBUV_VERSION%/libuv-%ARCH%-v%LIBUV_VERSION%.build7.exe
+  - libuv-%ARCH%-v%LIBUV_VERSION%.build7.exe /NCRC /S
+  - if "%ARCH%" EQU "x64" (set LIBUV=%ProgramFiles%\libuv) else (set LIBUV=%ProgramFiles(x86)%\libuv)
   - set PATH=%PATH%;%LIBUV%
 
 build_script:
-  - luarocks install lluv UV_DIR=%LIBUV% UV_LIBDIR=%LIBUV%\Release
+  - luarocks install lluv UV_DIR=%LIBUV%
   - luarocks install busted
   - busted -v --filter-out=scheduler
   - luarocks make rocks/lift-scm-0.rockspec
