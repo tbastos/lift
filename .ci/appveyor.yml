@@ -32,7 +32,7 @@ install:
   - set LIBUV_VERSION=1.7.5
   - appveyor DownloadFile http://dist.libuv.org/dist/v%LIBUV_VERSION%/libuv-%ARCH%-v%LIBUV_VERSION%.build7.exe
   - libuv-%ARCH%-v%LIBUV_VERSION%.build7.exe /NCRC /S
-  - if "%ARCH%" EQU "x64" (set LIBUV=%ProgramFiles%\libuv) else (set LIBUV=%ProgramFiles(x86)%\libuv)
+  - if "%ARCH%" EQU "x64" (set LIBUV="%ProgramFiles%\libuv") else (set LIBUV="%ProgramFiles(x86)%\libuv")
   - set PATH=%PATH%;%LIBUV%
 
 build_script:
