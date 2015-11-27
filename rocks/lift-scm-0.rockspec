@@ -29,10 +29,10 @@ build = {
     ["lift.diagnostics"] = "lift/diagnostics.lua",
     ["lift.loader"] = "lift/loader.lua",
     ["lift.path"] = "lift/path.lua",
-    ["lift.scheduler"] = "lift/scheduler.lua",
     ["lift.string"] = "lift/string.lua",
     ["lift.task"] = "lift/task.lua",
     ["lift.template"] = "lift/template.lua",
+    ["lift.thread"] = "lift/thread.lua",
     ["lift.utils"] = "lift/utils.lua",
 
     ["lift.files.cli"] = "lift/files/cli.lua",
