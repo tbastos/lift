@@ -44,16 +44,35 @@ describe("lift.thread", function()
       local function add_two() thread.sleep(0) v = v + 2 end
       local function times_two() v = v * 2 end
       local function wait_times_two(future) thread.wait(future) v = v * 2 end
-      -- test without wait
+      -- without wait
       thread.spawn(add_two)
       thread.spawn(times_two)
       thread.run()
       assert.equal(4, v)
-      -- test with wait
+      -- with wait
       v = 1
       thread.spawn(wait_times_two, thread.spawn(add_two))
       thread.run()
       assert.equal(6, v)
+    end)
+
+    it("can wait() for a coroutine with a timeout", function()
+      local function short_task() thread.sleep(20) end
+      local function long_task() thread.sleep(60) end
+      local function patient_wait(future) return thread.wait(future, 80) end
+      local function impatient_wait(future) return thread.wait(future, 40) end
+      -- successfully wait for a short task
+      local f = thread.spawn(impatient_wait, thread.spawn(short_task))
+      thread.run()
+      assert.True(f.results[1])
+      -- unsuccessfully wait for a long task
+      f = thread.spawn(impatient_wait, thread.spawn(long_task))
+      thread.run()
+      assert.False(f.results[1])
+      -- successfully wait for a long task
+      f = thread.spawn(patient_wait, thread.spawn(long_task))
+      thread.run()
+      assert.True(f.results[1])
     end)
 
   end)

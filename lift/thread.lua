@@ -18,10 +18,10 @@ local uv = require 'lluv'
 
 local coroutines = {} -- list of free coroutines, and also a map{co = future}
 
--- Reusable coroutine function.
+-- Reusable coroutine function. Returns on_done when f(arg) finishes.
 local function thread_f(f, arg, on_done)
-  while f do
-    -- on_done is yielded to indicate that f(arg) finished
+  while true do
+    assert(f, "coroutine has no function to run!")
     f, arg, on_done = co_yield(on_done, {f(arg)})
   end
 end
@@ -72,21 +72,17 @@ local function spawn(f, arg)
   return future
 end
 
--- Returns whether a future was fulfilled.
--- TODO: If the coroutine raised an error, this function raises the error.
-local function check(future)
-  return future.results ~= false
-end
-
--- Schedules a coroutine to run again.
+-- Schedules a coroutine to be resumed as soon as possible.
 local function set_ready(future, co)
   ready[future] = co or future.co
 end
 
+-- Registers waiter to be resumed when future is fulfilled.
 local function add_waiter(waiter, future)
   local t = future.waiters
   if not t then t = {} ; future.waiters = t end
-  t[#t+1] = waiter
+  t[waiter] = true
+  return t
 end
 
 -- Called when a future is fulfilled.
@@ -95,8 +91,11 @@ local function on_done(future, res)
   co_free(future.co, future)
   local waiters = future.waiters
   if waiters then
-    for i = 1, #waiters do
-      set_ready(waiters[i])
+    while true do
+      local w = next(waiters)
+      if not w then break end
+      waiters[w] = nil
+      set_ready(w)
     end
   end
 end
@@ -107,20 +106,29 @@ end
 
 local timers = {} -- map{timer = future}
 
-local function on_timeout(timer)
-  timer:stop()
+local function remove_timer(timer)
+  timer:close()
   local future = timers[timer]
   timers[timer] = nil
+  return future
+end
+
+local function on_timeout(timer)
+  local future = remove_timer(timer)
   set_ready(future)
+end
+
+local function add_timeout(milliseconds, future)
+  local timer = uv.timer()
+  timer:start(milliseconds, on_timeout)
+  timers[timer] = future
+  return timer
 end
 
 -- Suspends the current coroutine and resumes milliseconds later.
 -- Returns the actual dt spent sleeping and the current timestamp in ms.
 local function sleep(milliseconds)
-  local future = co_get()
-  local timer = uv.timer()
-  timer:start(milliseconds, on_timeout)
-  timers[timer] = future
+  add_timeout(milliseconds, co_get())
   local t0 = uv.now()
   co_yield()
   local now = uv.now()
@@ -163,11 +171,23 @@ end
 -- or until `timeout` milliseconds have passed. The timeout is optional.
 -- Returns true if the future was fulfilled, false if timed out.
 local function wait(future, timeout)
-  local this_future, this_co = co_get()
+  local this_future = co_get()
   if future == this_future then return true end -- never wait for itself
-  add_waiter(this_future, future)
-  co_yield()
-  return check(future)
+  local waiters = add_waiter(this_future, future)
+  if timeout then
+    local timer = add_timeout(timeout, this_future)
+    co_yield()
+    if waiters[this_future] then -- still in the wait list = timed out
+      waiters[this_future] = nil
+      return false
+    else -- fulfilled
+      remove_timer(timer)
+    end
+  else
+    co_yield()
+  end
+  -- TODO: If the coroutine raised an error, raise the error here?
+  return true
 end
 
 local function wait_all(futures, timeout)
