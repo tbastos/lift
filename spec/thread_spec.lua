@@ -3,6 +3,11 @@ describe("lift.thread", function()
   local uv = require 'lluv'
   local thread = require 'lift.thread'
 
+  local TOLERANCE = 20 -- time tolerance for timer callbacks
+  if os.getenv('CI') then
+    TOLERANCE = 40 -- increase tolerance in CI build servers
+  end
+
   it("offers run() to run all scheduled functions to completion", function()
     thread.run()
   end)
@@ -30,11 +35,10 @@ describe("lift.thread", function()
       local t0 = uv.now()
       thread.run()
       local elapsed = uv.now() - t0
-      local tolerance = 25
-      assert.near(20, sleep_30.results[1], tolerance)
-      assert.near(60, sleep_60.results[1], tolerance)
-      assert.near(90, sleep_90.results[1], tolerance)
-      assert.near(90, elapsed, tolerance)
+      assert.near(20, sleep_30.results[1], TOLERANCE)
+      assert.near(60, sleep_60.results[1], TOLERANCE)
+      assert.near(90, sleep_90.results[1], TOLERANCE)
+      assert.near(90, elapsed, TOLERANCE)
       assert.True(sleep_30.results[2] < sleep_60.results[2])
       assert.True(sleep_60.results[2] < sleep_90.results[2])
     end)
@@ -54,6 +58,12 @@ describe("lift.thread", function()
       thread.spawn(wait_times_two, thread.spawn(add_two))
       thread.run()
       assert.equal(6, v)
+      -- waiting for itself?
+      local future
+      local function wait_self() return thread.wait(future) end
+      future = thread.spawn(wait_self)
+      thread.run()
+      assert.equal(true, future.results[1])
     end)
 
     it("can wait() for a coroutine with a timeout", function()
@@ -73,6 +83,41 @@ describe("lift.thread", function()
       f = thread.spawn(patient_wait, thread.spawn(long_task))
       thread.run()
       assert.True(f.results[1])
+    end)
+
+    local function test_wait_all(n, timeout, expects, tolerance)
+      local function sleep(ms) thread.sleep(ms) end
+      local list = {}
+      for i = 1, n do
+        list[#list + 1] = thread.spawn(sleep, i * TOLERANCE)
+      end
+      local function main()
+        local res = thread.wait_all(list, timeout)
+        local count = 0 -- fulfilled futures
+        for i = 1, n do
+          if list[i].results then
+            count = count + 1
+          else
+            list[i]:abort()
+          end
+        end
+        return res, count
+      end
+      local main_future = thread.spawn(main)
+      local t0 = uv.now()
+      thread.run()
+      local elapsed  = uv.now() - t0
+      assert.near(expects * TOLERANCE, elapsed, TOLERANCE)
+      assert.equal(expects == n, main_future.results[1])
+      assert.near(expects, main_future.results[2], tolerance)
+    end
+
+    it("can wait_all() for multiple coroutines to finish", function()
+      test_wait_all(6, nil, 6, 0)
+    end)
+
+    it("can wait_all() for multiple coroutines with a timeout", function()
+      test_wait_all(100, 3*TOLERANCE, 3, 1)
     end)
 
   end)
