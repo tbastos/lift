@@ -24,18 +24,19 @@ describe("lift.thread", function()
 
     it("can sleep() and resume later", function()
       local function test_sleep(dt) return thread.sleep(dt) end
-      local sleep_20 = thread.spawn(test_sleep, 20)
+      local sleep_30 = thread.spawn(test_sleep, 30)
+      local sleep_90 = thread.spawn(test_sleep, 90)
       local sleep_60 = thread.spawn(test_sleep, 60)
-      local sleep_40 = thread.spawn(test_sleep, 40)
       local t0 = uv.now()
       thread.run()
       local elapsed = uv.now() - t0
-      assert.near(20, sleep_20.results[1], 15)
-      assert.near(40, sleep_40.results[1], 10)
-      assert.near(60, sleep_60.results[1], 10)
-      assert.near(60, elapsed, 10)
-      assert.True(sleep_20.results[2] < sleep_40.results[2])
-      assert.True(sleep_40.results[2] < sleep_60.results[2])
+      local tolerance = 25
+      assert.near(20, sleep_30.results[1], tolerance)
+      assert.near(60, sleep_60.results[1], tolerance)
+      assert.near(90, sleep_90.results[1], tolerance)
+      assert.near(90, elapsed, tolerance)
+      assert.True(sleep_30.results[2] < sleep_60.results[2])
+      assert.True(sleep_60.results[2] < sleep_90.results[2])
     end)
 
     it("can wait() for another coroutine to finish", function()
