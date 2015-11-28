@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------------
--- Threading Module (based on coroutines and futures)
+-- Module for asynchronous programming based on coroutines and futures
 ------------------------------------------------------------------------------
 
 local assert, next = assert, next
@@ -9,20 +9,28 @@ local co_resume = coroutine.resume
 local co_yield = coroutine.yield
 local co_running = coroutine.running
 
-local lstr_format = require('lift.string').format
-local uv = require 'lluv'
+local diagnostics = require 'lift.diagnostics'
+local pcall = diagnostics.pcall
+
+local uv = require 'lluv' -- needed for timer callbacks (sleep/timeout)
 
 ------------------------------------------------------------------------------
 -- Coroutine (thread) Pool
 ------------------------------------------------------------------------------
 
 local coroutines = {} -- list of free coroutines, and also a map{co = future}
+local execute   -- called to execute a future
+local on_done   -- called when a future is fulfilled
+local on_error  -- called when a future is rejected (i.e. it raised an error)
 
--- Reusable coroutine function. Returns on_done when f(arg) finishes.
-local function thread_f(f, arg, on_done)
+-- Reusable coroutine function. Calls dispatch(future) in cycles.
+local function thread_f(future)
   while true do
-    assert(f, "coroutine has no function to run!")
-    f, arg, on_done = co_yield(on_done, {f(arg)})
+    assert(future, "thread_f has no future")
+    local ok, res = pcall(execute, future)
+    local event = ok and on_done or on_error
+    event(future, res)
+    future = co_yield(res)
   end
 end
 
@@ -49,7 +57,7 @@ end
 -- Must be called from within a coroutine created by this module.
 local function co_get()
   local co = co_running()
-  return assert(coroutines[co], 'not in a lift.thread coroutine'), co
+  return assert(coroutines[co], 'not in a lift.async coroutine'), co
 end
 
 ------------------------------------------------------------------------------
@@ -74,41 +82,69 @@ local function remove_timer(timer, future)
 end
 
 ------------------------------------------------------------------------------
--- Future (promise for an async function call executed in a coroutine)
+-- Scheduler
 ------------------------------------------------------------------------------
 
-local Future = {} -- Future class
 local ready = {}  -- map{future = coroutine/false} of calls ready to run
-
-Future.__index = Future
-
-function Future:__tostring()
-  return 'lift.thread.Future('..tostring(self.f)..', '..lstr_format(self.arg)..')'
-end
-
--- Prematurely kills a coroutine. This is currently only meant for tests.
-function Future:abort()
-  ready[self] = nil
-  coroutines[self.co] = nil
-  if self.timer then remove_timer(self.timer, self) end
-end
-
--- Schedules a function to be called asynchronously as `f(arg)` in a coroutine.
--- Returns a future that can be used to wait and retrieve the function results.
-local function spawn(f, arg)
-  local future = setmetatable({f = f, arg = arg,
-    co = false, results = false}, Future)
-  ready[future] = false
-  return future
-end
 
 -- Schedules a coroutine to be resumed as soon as possible.
 local function set_ready(future, co)
   ready[future] = co or future.co
 end
 
+-- Runs until all threads are either blocked or done.
+local function step()
+  while true do
+    local future, co = next(ready)
+    if not future then return end
+    local ok, err
+    if co then -- resume a running coroutine
+      ok, err = co_resume(co)
+    else -- start running a new coroutine
+      co = co_alloc(future)
+      future.co = co
+      ok, err = co_resume(co, future)
+    end
+    if not ok then
+      error('coroutine raised error: '..tostring(err))
+    end
+    ready[future] = nil
+  end
+end
+
+------------------------------------------------------------------------------
+-- Future (proxy object for an async function call executed in a coroutine)
+------------------------------------------------------------------------------
+
+local Future = {} -- Future class
+Future.__index = Future
+
+function Future:__tostring()
+  return 'lift.async.Future('..tostring(self.f)..', '..tostring(self.arg)..')'
+end
+
+-- Kills a running coroutine. This is dangerous and can easily cause bugs!
+-- Useful for tests. Only call you *really* know what you're doing.
+function Future:abort()
+  ready[self] = nil
+  local co, timer = self.co, self.timer
+  if co then coroutines[co] = nil end
+  if timer then remove_timer(timer, self) end
+end
+
+-- Adds a function to be called when the future's thread finishes.
+-- Callback arguments: future, error (or nil), results (table, or nil)
+function Future:after(callback)
+  self[#self+1] = callback
+end
+
+-- Called by coroutines to execute a future.
+execute = function(future)
+  return {future.f(future.arg)}
+end
+
 -- Called when a future is fulfilled.
-local function on_done(future, res)
+on_done = function(future, res)
   future.results = res
   co_free(future.co, future)
   local waiters = future.waiters
@@ -124,6 +160,10 @@ local function on_done(future, res)
   end
 end
 
+-- Called when an error is raised in a coroutine.
+on_error = function(future, err)
+end
+
 -- Called when a timer rings.
 local function on_timeout(timer)
   local future = timers[timer]
@@ -132,40 +172,28 @@ local function on_timeout(timer)
 end
 
 ------------------------------------------------------------------------------
--- Scheduler
+-- Public API
 ------------------------------------------------------------------------------
 
--- Runs until all threads are either waiting or done.
-local function step()
-  while true do
-    local future, co = next(ready)
-    if not future then return end
-    local ok, action, res
-    if co then -- resume a running coroutine
-      ok, action, res = co_resume(co)
-    else -- start running a new coroutine
-      co = co_alloc(future)
-      future.co = co
-      ok, action, res = co_resume(co, future.f, future.arg, on_done)
-    end
-    if not ok then
-      error('coroutine raised error: '..tostring(action))
-    elseif action then
-      action(future, res)
-    end
-    ready[future] = nil
-  end
+-- Schedules a function to be called asynchronously as `f(arg)` in a coroutine.
+-- Returns a future object for interfacing with the async call.
+local function async(f, arg)
+  local future = setmetatable({f = f, arg = arg,
+    co = false, results = false}, Future)
+  ready[future] = false
+  return future
 end
 
--- Runs all scheduled functions to completion. Call this from the main thread.
+-- Runs all async functions to completion. Call this from the main thread.
 local function run()
   repeat step() until uv.run(uv.RUN_ONCE) == 0
   step() -- handles final events
 end
 
--- Suspends the current coroutine until the given `future` is fulfilled,
--- or until `timeout` milliseconds have passed. The timeout is optional.
--- Returns true if the future was fulfilled, false if timed out.
+-- Suspends the calling thread until the given `future` is fulfilled,
+-- or until `timeout` milliseconds have passed (timeout is optional).
+-- Returns true if the future was fulfilled; false if an error ocurred or
+-- if wait() timed out. Returns the error or "timed out" as second result.
 local function wait(future, timeout)
   local this_future = co_get()
   if future == this_future then return true end -- never wait for itself
@@ -178,7 +206,7 @@ local function wait(future, timeout)
     co_yield()
     if waiters[this_future] then -- timed out
       waiters[this_future] = nil
-      return false
+      return false, 'timed out'
     else -- fulfilled
       remove_timer(timer, this_future)
     end
@@ -231,11 +259,12 @@ end
 -- Module Table
 ------------------------------------------------------------------------------
 
-return {
+return setmetatable({
+  async = async,
   run = run,
   sleep = sleep,
-  spawn = spawn,
-  step = step,
   wait = wait,
   wait_all = wait_all,
-}
+}, {__call = function(M, f, arg) -- calling the module == calling async()
+  return async(f, arg)
+end})

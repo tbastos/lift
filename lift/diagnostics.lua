@@ -301,6 +301,7 @@ end
 
 ------------------------------------------------------------------------------
 -- wrap(f) calls f and automatically reports errors and diagnostics
+-- This is meant to be used only once, to wrap the whole program.
 ------------------------------------------------------------------------------
 
 local function wrap(f)
@@ -375,7 +376,7 @@ end
 -- Module Table
 ------------------------------------------------------------------------------
 
-local M = {
+return {
   capture = capture,
   fail_if_error = fail_if_error,
   is_a = is_a,
@@ -392,5 +393,3 @@ local M = {
   Verifier = Verifier,
   wrap = wrap,
 }
-
-return M

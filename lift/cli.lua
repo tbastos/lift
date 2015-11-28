@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------------
--- Simple, composable Command-Line Interfaces with command hierarchies
+-- Composable command-line interfaces based on command hierarchies
 ------------------------------------------------------------------------------
 
 local assert, ipairs, pairs, type = assert, ipairs, pairs, type

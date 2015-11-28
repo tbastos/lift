@@ -23,6 +23,7 @@ build = {
   type = "builtin",
 
   modules = {
+    ["lift.async"] = "lift/async.lua",
     ["lift.cli"] = "lift/cli.lua",
     ["lift.color"] = "lift/color.lua",
     ["lift.config"] = "lift/config.lua",
@@ -32,7 +33,6 @@ build = {
     ["lift.string"] = "lift/string.lua",
     ["lift.task"] = "lift/task.lua",
     ["lift.template"] = "lift/template.lua",
-    ["lift.thread"] = "lift/thread.lua",
     ["lift.utils"] = "lift/utils.lua",
 
     ["lift.files.cli"] = "lift/files/cli.lua",
