@@ -3,7 +3,7 @@
 ------------------------------------------------------------------------------
 
 local assert, ipairs, pairs, type = assert, ipairs, pairs, type
-local unpack = table.unpack or unpack -- Lua 5.1 compatibility
+local unpack = table.unpack
 
 local config = require 'lift.config'
 local diagnostics = require 'lift.diagnostics'

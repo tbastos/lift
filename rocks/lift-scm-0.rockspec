@@ -13,7 +13,7 @@ description = {
 }
 
 dependencies = {
-  'lua >= 5.1',
+  'lua >= 5.2',
   'lpeg >= 1.0.0',
   'lluv >= 0.1.3',
   'luafilesystem >= 1.6.3',

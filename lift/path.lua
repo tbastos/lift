@@ -2,12 +2,10 @@
 -- Directory and File Path Manipulation Routines
 ------------------------------------------------------------------------------
 
-local assert, tostring, type = assert, tostring, type
+local assert, load, tostring, type = assert, load, tostring, type
+local unpack, tbl_concat = table.unpack, table.concat
 local str_match, str_gmatch = string.match, string.gmatch
 local str_sub, str_find, str_gsub = string.sub, string.find, string.gsub
-local tbl_concat = table.concat
-local unpack = table.unpack or unpack -- Lua 5.1 compatibility
-local loadstring = loadstring or load -- Lua 5.1 compatibility
 local from_glob = require('lift.string').from_glob
 
 -- bypass mutual dependency with lift.config
@@ -239,7 +237,7 @@ local function globber_factory(n)
       i..'] = '..(i > 1 and 'v' or 'abs(v, nil, true)')..'\n'
   end
   t[#t + 1] = 'v = concat(t) until stat(v) return v end'
-  return assert(loadstring(tbl_concat(t), '=globber_factory('..n..')'))
+  return assert(load(tbl_concat(t), '=globber_factory('..n..')'))
 end
 
 local cache = {}

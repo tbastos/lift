@@ -2,14 +2,11 @@
 -- Templating Engine
 ------------------------------------------------------------------------------
 
-local type = type
-local assert = assert
-local tostring = tostring
+local assert, load, tostring, type = assert, load, tostring, type
 local setmetatable = setmetatable
 local ssub = string.sub
 local sfind = string.find
 local tconcat = table.concat
-local loadstring = loadstring or load -- Lua 5.1 compatibility
 
 local path = require 'lift.path'
 
@@ -108,11 +105,11 @@ local env = setmetatable({
 })
 
 -- given a string, return a template function f(writer, context, indent)
-local setfenv = setfenv -- Lua 5.1 compatibility
+local setfenv = setfenv -- LuaJIT compatibility
 local function compile(str, name)
   local source = rewrite(str, name)
   if name then name = '@'..name end
-  local f, err = loadstring(source, name, 't', env)
+  local f, err = load(source, name, 't', env)
   if err then error(err) end
   if setfenv then setfenv(f, env) end
   return f
@@ -144,7 +141,7 @@ end
 -- Loads a function from a template file. If 'from' is given it should be
 -- an absolute filename relative to which 'name' is resolved.
 -- Otherwise search for 'name' in ${load_path}.
-local function load(name, from)
+local function load_template(name, from)
   name = resolve(name, from)
   local cached = cache[name]
   if cached then return cached end
@@ -160,14 +157,14 @@ local function load(name, from)
   return func
 end
 
-env._load = load
+env._load = load_template
 
 ------------------------------------------------------------------------------
 -- Module Table
 ------------------------------------------------------------------------------
 
 local M = {
-  load = load,
+  load = load_template,
   cache = cache,
   compile = compile,
   set_env = set_env,

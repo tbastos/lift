@@ -18,7 +18,8 @@ Lift is both a **task automation tool** and a **framework** for writing command-
 
 ### Prerequisites
 - **OS:** Linux, OSX or Windows (should work on any POSIX system)
-- **Lua:** Lua 5.2, Lua 5.3, LuaJIT 2.0 or LuaJIT 2.1
+- **Lua:** Lua 5.2, Lua 5.3, LuaJIT 2.0 or LuaJIT 2.1 (LuaJIT should be
+compiled with [Lua 5.2 compatibility](http://luajit.org/extensions.html))
 - **Libraries:** [LPeg], [LFS] and [lluv]
  
 ## Installation

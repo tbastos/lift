@@ -2,9 +2,8 @@
 -- Task Engine
 ------------------------------------------------------------------------------
 
-local tostring, type = tostring, type
+local tostring, type, unpack = tostring, type, table.unpack
 local getmetatable, setmetatable = getmetatable, setmetatable
-local unpack = table.unpack or unpack -- Lua 5.1 compatibility
 local str_find, str_gmatch, str_match = string.find, string.gmatch, string.match
 local tbl_concat, tbl_sort = table.concat, table.sort
 

@@ -8,7 +8,7 @@ local config = require 'lift.config'
 local loader = require 'lift.loader'
 local diagnostics = require 'lift.diagnostics'
 
-local ok = diagnostics.wrap(function()
+os.exit(diagnostics.wrap(function()
 
   -- parse key=value configs at the beginning of arg list
   local cli_scope = config:new_parent('cli')
@@ -39,6 +39,4 @@ local ok = diagnostics.wrap(function()
   -- process CLI
   app:process(arg)
 
-end)
-
-os.exit(ok and 0 or 1) -- Lua 5.1 compatibility
+end))
