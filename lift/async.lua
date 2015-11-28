@@ -105,9 +105,7 @@ local function step()
       future.co = co
       ok, err = co_resume(co, future)
     end
-    if not ok then
-      error('coroutine raised error: '..tostring(err))
-    end
+    if not ok then error('unexpected coroutine error: '..tostring(err)) end
     ready[future] = nil
   end
 end
