@@ -64,7 +64,8 @@ describe("lift.async", function()
       local function wait_self() return async.wait(future) end
       future = async(wait_self)
       async.run()
-      assert.equal(true, future.results[1])
+      assert.error_matches(function() return future.results end,
+        'future cannot wait for itself')
     end)
 
     it("can wait() for a coroutine with a timeout", function()
@@ -86,39 +87,29 @@ describe("lift.async", function()
       assert.True(f.results[1])
     end)
 
-    local function test_wait_all(n, timeout, expects, tolerance)
+    it("can wait_all() for multiple coroutines to finish", function()
       local function sleep(ms) async.sleep(ms) end
-      local list = {}
-      for i = 1, n do
-        list[#list + 1] = async(sleep, i * TOLERANCE)
-      end
-      local function main()
-        local res = async.wait_all(list, timeout)
+      local function main(n)
+        local list = {}
+        for i = 1, n do
+          list[#list + 1] = async(sleep, i * TOLERANCE)
+        end
+        async.wait_all(list)
         local count = 0 -- fulfilled futures
         for i = 1, n do
           if list[i].results then
             count = count + 1
-          else
-            list[i]:abort()
           end
         end
-        return res, count
+        return count
       end
-      local main_future = async(main)
+      local n = 6
+      local future = async(main, n)
       local t0 = uv.now()
       async.run()
       local elapsed  = uv.now() - t0
-      assert.near(expects * TOLERANCE, elapsed, TOLERANCE)
-      assert.equal(expects == n, main_future.results[1])
-      assert.near(expects, main_future.results[2], tolerance)
-    end
-
-    it("can wait_all() for multiple coroutines to finish", function()
-      test_wait_all(6, nil, 6, 0)
-    end)
-
-    it("can wait_all() for multiple coroutines with a timeout", function()
-      test_wait_all(100, 3*TOLERANCE, 3, 1)
+      assert.equal(n, future.results[1])
+      assert.near(n * TOLERANCE, elapsed, TOLERANCE)
     end)
 
   end)
