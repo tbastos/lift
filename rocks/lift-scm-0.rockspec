@@ -13,7 +13,7 @@ description = {
 }
 
 dependencies = {
-  'lua >= 5.2',
+  'lua >= 5.1', -- actually 5.2 and LuaJIT, but LuaJIT self-identifies as 5.1
   'lpeg >= 1.0.0',
   'lluv >= 0.1.3',
   'luafilesystem >= 1.6.3',
