@@ -6,7 +6,8 @@
 -- integrate one through a diagnostics consumer. The focus here is
 -- on an error handling system well suited to tools and compilers.
 
-local rawget, type, unpack = rawget, type, table.unpack
+local rawget, type = rawget, type
+local unpack = table.unpack or unpack -- LuaJIT compatibility
 local clock = os.clock
 local str_find = string.find
 local dbg_upvalue, dbg_traceback = debug.getupvalue, debug.traceback

@@ -47,10 +47,8 @@ describe("A lift.task", function()
       assert.equal(task, task.task2.group)
       assert.equal(subgroup, subgroup.task1.group)
       assert.equal('subgroup:task1', tostring(task.subgroup.task1))
-      if _ENV then -- Lua 5.2+
-        assert.error_matches(function() function task.func() end end,
-          "tasks must be declared as :methods%(%) not %.functions%(%)")
-      end
+      assert.error_matches(function() function task.func() end end,
+        "tasks must be declared as :methods%(%) not %.functions%(%)")
     end)
 
     it("forbids invalid task names and non-task values", function()

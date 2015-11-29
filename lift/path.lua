@@ -3,7 +3,8 @@
 ------------------------------------------------------------------------------
 
 local assert, load, tostring, type = assert, load, tostring, type
-local unpack, tbl_concat = table.unpack, table.concat
+local unpack = table.unpack or unpack -- LuaJIT compatibility
+local tbl_concat = table.concat
 local str_match, str_gmatch = string.match, string.gmatch
 local str_sub, str_find, str_gsub = string.sub, string.find, string.gsub
 local from_glob = require('lift.string').from_glob

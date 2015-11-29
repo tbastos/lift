@@ -2,12 +2,12 @@
 -- Composable command-line interfaces based on command hierarchies
 ------------------------------------------------------------------------------
 
-local assert, ipairs, pairs, type = assert, ipairs, pairs, type
-local unpack = table.unpack
-
 local config = require 'lift.config'
 local diagnostics = require 'lift.diagnostics'
 local to_bool = require('lift.string').to_bool
+
+local assert, ipairs, pairs, type = assert, ipairs, pairs, type
+local unpack = table.unpack or unpack -- LuaJIT compatibility
 
 ------------------------------------------------------------------------------
 -- Option (an optional value specified for a command)

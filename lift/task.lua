@@ -2,13 +2,14 @@
 -- Task Engine
 ------------------------------------------------------------------------------
 
-local tostring, type, unpack = tostring, type, table.unpack
-local getmetatable, setmetatable = getmetatable, setmetatable
-local str_find, str_gmatch, str_match = string.find, string.gmatch, string.match
-local tbl_concat, tbl_sort = table.concat, table.sort
-
 local diagnostics = require 'lift.diagnostics'
 local lstr_format = require('lift.string').format
+
+local tostring, type = tostring, type
+local getmetatable, setmetatable = getmetatable, setmetatable
+local unpack = table.unpack or unpack -- LuaJIT compatibility
+local str_find, str_gmatch, str_match = string.find, string.gmatch, string.match
+local tbl_concat, tbl_sort = table.concat, table.sort
 
 ------------------------------------------------------------------------------
 -- TaskSet object (callable set of tasks)
@@ -77,11 +78,9 @@ local function validate_f(f)
   if type(f) ~= 'function' then
     error('expected a function, got '..lstr_format(f), 2)
   end
-  if _ENV then -- in Lua 5.2+ we check whether f is a method
-    local name = dbg_getlocal(f, 1)
-    if name ~= 'self' then
-      error('tasks must be declared as :methods() not .functions()')
-    end
+  local name = dbg_getlocal(f, 1)
+  if name ~= 'self' then
+    error('tasks must be declared as :methods() not .functions()')
   end
 end
 
