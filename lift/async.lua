@@ -106,6 +106,8 @@ function Future:abort()
   ready[self] = nil
   local co = self.co
   if co then coroutines[co] = nil end
+  local timer = self.timer
+  if timer then timer:close() ; self.timer = nil end
 end
 
 -- Adds a function to be called when the future's thread finishes.
@@ -169,12 +171,14 @@ local function wait(future, timeout)
   if future == this_future then error('future cannot wait for itself', 2) end
   if timeout then
     local timer = uv.timer()
+    this_future.timer = timer
     local function callback(future_or_timer, err, res)
       if timer == nil then return end -- ignore second call
       if future_or_timer == timer then res = 'timed out' end
       set_ready(this_future, res)
       timer:close()
       timer = nil
+      this_future.timer = nil
     end
     timer:start(timeout, callback)
     future:when_done(callback)
@@ -190,10 +194,22 @@ local function wait(future, timeout)
   return true, results
 end
 
--- Suspends the calling thread until any future in the list finishes.
--- Returns the first fulfilled future, or raises the first raised error.
+-- Suspends the calling thread until one future in the list finishes execution.
+-- Either returns the first fulfilled future, or raises the first raised error.
 local function wait_any(futures)
-  -- TODO
+  local e, this_future = nil, co_get()
+  local function callback(future, err, res)
+    e = err
+    set_ready(this_future, future)
+  end
+  for i = 1, #futures do
+    local f = futures[i]
+    if f == this_future then error('future cannot wait for itself', 2) end
+    f:when_done(callback)
+  end
+  local first = co_yield()
+  if e then error(e) end
+  return first
 end
 
 -- Suspends the calling thread until all futures in the list finish execution.
@@ -218,6 +234,7 @@ end
 -- Returns the time spent sleeping and the current timestamp, in milliseconds.
 local function sleep(milliseconds)
   local timer, this_future = uv.timer(), co_get()
+  this_future.timer = timer
   timer:start(milliseconds, function()
     set_ready(this_future)
   end)
@@ -225,6 +242,7 @@ local function sleep(milliseconds)
   co_yield()
   local now = uv.now()
   timer:close()
+  this_future.timer = nil
   return now - t0, now
 end
 

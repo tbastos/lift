@@ -87,13 +87,40 @@ describe("lift.async", function()
       assert.True(f.results[1])
     end)
 
+    it("can wait_any() for multiple coroutines to finish", function()
+      local function sleep(ms) async.sleep(ms) end
+      local n, list = 50, {}
+      for i = 1, n do
+        list[#list + 1] = async(sleep, i * TOLERANCE)
+      end
+      local function main()
+        local first = async.wait_any(list)
+        local count = 0 -- fulfilled futures
+        for i = 1, n do
+          if list[i].results then
+            count = count + 1
+          else
+            list[i]:abort()
+          end
+        end
+        return first, count
+      end
+      local future = async(main)
+      local t0 = uv.now()
+      async.run()
+      local elapsed  = uv.now() - t0
+      assert.equal(list[1], future.results[1])
+      assert.equal(1, future.results[2])
+      assert.near(TOLERANCE, elapsed, TOLERANCE)
+    end)
+
     it("can wait_all() for multiple coroutines to finish", function()
       local function sleep(ms) async.sleep(ms) end
-      local function main(n)
-        local list = {}
-        for i = 1, n do
-          list[#list + 1] = async(sleep, i * TOLERANCE)
-        end
+      local n, list = 6, {}
+      for i = 1, n do
+        list[#list + 1] = async(sleep, i * TOLERANCE)
+      end
+      local function main()
         async.wait_all(list)
         local count = 0 -- fulfilled futures
         for i = 1, n do
@@ -103,8 +130,7 @@ describe("lift.async", function()
         end
         return count
       end
-      local n = 6
-      local future = async(main, n)
+      local future = async(main)
       local t0 = uv.now()
       async.run()
       local elapsed  = uv.now() - t0
