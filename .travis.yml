@@ -20,7 +20,7 @@ before_install:
   - git clone https://github.com/libuv/libuv && cd libuv && sh autogen.sh && ./configure && make && cd ..
 
 before_script:
-  - luarocks install lluv UV_DIR=/home/travis/build/tbastos/lift/libuv UV_LIBDIR=/home/travis/build/tbastos/lift/libuv/.libs
+  - luarocks install lluv UV_DIR=$TRAVIS_BUILD_DIR/libuv UV_LIBDIR=$TRAVIS_BUILD_DIR/libuv/.libs
   - luarocks install busted
   - luarocks install luacov
   - luarocks install luacov-coveralls

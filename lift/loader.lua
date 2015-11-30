@@ -26,40 +26,44 @@ local function find_scripts(type, subtype, reverse_order)
   local i = (reverse_order and #load_path or 1)
   local dir, dir_obj, subdir, subdir_obj
   return function()
-    repeat -- iterate dirs in load_path
-      while dir do -- while we're in the same dir
-        repeat -- iterate names in dir
-          while subdir do -- while we're in the same subdir
-            repeat -- iterate names in subdir
-              local subname = subdir_obj:next()
-              if not subname then subdir = nil break end
-              local _, e, sep, sub = str_find(subname, subpatt)
-              if e and (sub == '' or sep == '_') then
-                local filename = subdir..'/'..subname
-                if is_file(filename) then return filename end
-              end
-            until false
-          end
-          local name = dir_obj:next() ; if not name then dir = nil break end
-          if name == type then
-            local fullname = dir..'/'..name
-            if is_dir(fullname) then
-              subdir = fullname
-              local _ ; _, subdir_obj = read_dir(subdir)
-            end
-          else
-            local _, e, sep, sub = str_find(name, patt)
-            if e and (sub == '' or sep == '_') then
-              local filename = dir..'/'..name
-              if is_file(filename) then return filename end
-            end
-          end
-        until false
+    local _, _name, _e, _sep, _sub -- temp vars
+    if subdir then goto iterate_subdir end
+    if dir then goto iterate_dir end
+
+    ::iterate_load_path::
+    dir = load_path[i]
+    if not dir then return nil end
+    i = i + (reverse_order and -1 or 1)
+    _, dir_obj = read_dir(dir)
+
+    ::iterate_dir::
+    _name = dir_obj:next()
+    if not _name then goto iterate_load_path end
+    if _name == type then
+      _name = dir..'/'.._name
+      if is_dir(_name) then
+        subdir = _name
+        _, subdir_obj = read_dir(subdir)
+        goto iterate_subdir
       end
-      dir = load_path[i] ; if not dir then return nil end
-      i = i + (reverse_order and -1 or 1)
-      local _ ; _, dir_obj = read_dir(dir)
-    until false
+    else
+      _, _e, _sep, _sub = str_find(_name, patt)
+      if _e and (_sub == '' or _sep == '_') then
+        _name = dir..'/'.._name
+        if is_file(_name) then return _name end
+      end
+    end
+    goto iterate_dir
+
+    ::iterate_subdir::
+      _name = subdir_obj:next()
+      if not _name then subdir = nil goto iterate_dir end
+      _, _e, _sep, _sub = str_find(_name, subpatt)
+      if _e and (_sub == '' or _sep == '_') then
+        _name = subdir..'/'.._name
+        if is_file(_name) then return _name end
+      end
+    goto iterate_subdir
   end
 end
 

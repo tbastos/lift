@@ -205,10 +205,10 @@ local function next_l(list, i)
   i = i + 1 ; return list[i], i
 end
 local function next_p(patt, dir_obj)
-  while true do
-    local s = dir_obj:next() if not s then dir_obj:close() return end
-    if s ~= '.' and s ~= '..' and match(s, patt) then return s, dir_obj end
-  end
+  ::start::
+  local s = dir_obj:next() if not s then dir_obj:close() return end
+  if s ~= '.' and s ~= '..' and match(s, patt) then return s, dir_obj end
+  goto start
 end
 
 -- returns an iterator and initial state for a component c

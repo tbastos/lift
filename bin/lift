@@ -2,8 +2,6 @@
 
 --collectgarbage('stop') -- disable GC by default
 
-if not table.unpack then table.unpack = unpack end -- LuaJIT compatibility
-
 local cli = require 'lift.cli'
 local task = require 'lift.task'
 local config = require 'lift.config'
