@@ -9,10 +9,13 @@
 local rawget, type = rawget, type
 local unpack = table.unpack or unpack -- LuaJIT compatibility
 local clock = os.clock
-local str_find = string.find
-local dbg_upvalue, dbg_traceback = debug.getupvalue, debug.traceback
+local str_find, str_sub = string.find, string.sub
+local dbg_getinfo, dbg_getupvalue = debug.getinfo, debug.getupvalue
+local dbg_traceback = debug.traceback
 
-local lstring = require 'lift.string'
+local ls = require 'lift.string'
+local ls_expand, ls_format, ls_capitalize = ls.expand, ls.format, ls.capitalize
+
 local color = require 'lift.color'
 local ESC = color.ESC
 
@@ -46,25 +49,6 @@ local styles = {
 }
 
 ------------------------------------------------------------------------------
--- Source Location (decorates a diagnostic with source code location)
-------------------------------------------------------------------------------
-
-local function get_line(source, pos)
-  local lend, lnum, lstart = 0, 0
-  repeat
-    lstart = lend + 1
-    lnum = lnum + 1
-    lend = str_find(source, '\n', lstart, true)
-  until not lend or lend >= pos
-  return source:sub(lstart, lend and lend - 1), lnum, pos - lstart + 1
-end
-
-local function new_source_location(file, contents, pos)
-  local code, line, column = get_line(contents, pos)
-  return { file = file, line = line, column = column, code = code }
-end
-
-------------------------------------------------------------------------------
 -- Diagnostic (a specially-formatted message, plus arguments and decorators)
 ------------------------------------------------------------------------------
 
@@ -74,10 +58,10 @@ local Diagnostic = {
   level = 'error',
 }
 
--- compute diag.message at the first access
+-- compute diag.message lazily
 function Diagnostic:__index(k)
   if k == 'message' then
-    local msg = lstring.expand(rawget(self, 0) or 'unknown issue', self)
+    local msg = ls_expand(rawget(self, 0) or 'no message', self)
     self.message = msg
     return msg
   end
@@ -87,7 +71,7 @@ end
 -- returns whether a value is a diagnostic
 local function is_a(t) return getmetatable(t) == Diagnostic end
 
--- creates a diagnostic from a message in the format: "kind: message"
+-- creates a diagnostic from a message in the format "kind: message"
 local function new(t, ...)
   local m -- message
   if type(t) == 'table' then
@@ -98,28 +82,23 @@ local function new(t, ...)
   assert(type(m) == 'string', "first arg must be a message")
   local sep = str_find(m, ': ', nil, true)
   if not sep then error("malformed diagnostic message '"..m.."'", 2) end
-  local kind, raw_message = m:sub(1, sep - 1), m:sub(sep + 2)
+  local kind, raw_message = str_sub(m, 1, sep - 1), str_sub(m, sep + 2)
   local level = levels[kind]
   if not level then error("unknown diagnostic kind '"..kind.."'", 2) end
   t.level, t.kind, t[0] = level, kind, raw_message
   return setmetatable(t, Diagnostic)
 end
 
--- adds a source location to the diagnostic
-function Diagnostic:source_location(file, contents, pos)
-  self.location = new_source_location(file, contents, pos)
-  return self
-end
+-- tostring(diagnostic) == diagnostic:format()
+function Diagnostic:__tostring() return self:format() end
 
--- tostring(diagnostic) == diagnostic.message
-function Diagnostic:__tostring() return self.message end
-
--- returns a default rendering of the diagnostic
-function Diagnostic:render()
-  local loc, txt, kind = self.location, '', self.kind
-  if loc then txt = loc.file .. ':' .. loc.line .. ':' .. loc.column .. ': '
-  else kind = lstring.capitalize(kind) end
-  return txt .. kind .. ': ' .. self.message
+-- formats the diagnostic to a string
+function Diagnostic:format()
+  local style = styles[self.kind] or styles[self.level]
+  local loc, str, prefix = self.location, '', style.prefix
+  if loc then str = loc.file..':'..loc.line..': '
+  else prefix = ls_capitalize(prefix) end
+  return str..prefix..' '..self.message
 end
 
 -- we report to a diagnostic consumer and keep track of the last error
@@ -145,6 +124,44 @@ local function report(...) new(...):report() end
 -- raises the most recent error-level diagnostic, if we got one
 local function fail_if_error()
   if last_error then error(last_error) end
+end
+
+------------------------------------------------------------------------------
+-- Decorator 'location' (indicates a position in a source file)
+------------------------------------------------------------------------------
+
+local function get_line(source, pos)
+  local lend, lnum, lstart = 0, 0
+  repeat
+    lstart = lend + 1
+    lnum = lnum + 1
+    lend = str_find(source, '\n', lstart, true)
+  until not lend or lend >= pos
+  return str_sub(source, lstart, lend and lend - 1), lnum, pos - lstart + 1
+end
+
+-- sets location based on filename, contents (string) and position (in string)
+function Diagnostic:source_location(file, contents, pos)
+  local code, line, column = get_line(contents, pos)
+  self.location = {file = file, line = line, column = column, code = code}
+  return self
+end
+
+-- sets location based on debug.getinfo (stack level or function)
+function Diagnostic:function_location(level)
+  local info = dbg_getinfo(level, 'Sl')
+  self.location = {file = info.short_src, line = info.currentline}
+  return self
+end
+
+------------------------------------------------------------------------------
+-- Decorator: 'lua_stb' (prints a Lua stack traceback)
+------------------------------------------------------------------------------
+
+-- default level is 1 (the function calling lua_traceback)
+function Diagnostic:lua_traceback(level)
+  self.lua_stb = dbg_traceback(nil, (level or 1) + 1)
+  return self
 end
 
 ------------------------------------------------------------------------------
@@ -176,7 +193,7 @@ function Verifier:verify(str_list)
   end
   for i = 1, #self do
     local expected = str_list[i]
-    local actual = self[i]:render()
+    local actual = tostring(self[i])
     if not str_find(actual, expected, 1, true) then
       error('mismatch at diagnostic #'..i..'\nActual: '..actual..
         '\nExpected: '..expected, 2)
@@ -208,20 +225,18 @@ end
 function Reporter:report(d)
   local style = styles[d.kind] or styles[d.level]
   local loc, prefix = d.location, style.prefix
-  if loc then -- some diagnostics include a source location
-    stderr:write(ESC'bold;white',
-      loc.file, ':', loc.line, ':', loc.column, ': ')
+  if loc then -- source file location
+    stderr:write(ESC'bold;white', loc.file, ':', loc.line, ':')
+    if loc.column then stderr:write(loc.column, ': ') end
   else
-    prefix = lstring.capitalize(prefix)
+    prefix = ls_capitalize(prefix)
   end
   stderr:write(color.from_style(style), prefix, ESC'clear',
     style.sep or ' ', d.message, ESC'clear', '\n')
-  -- errors may contain a Lua stack traceback
-  if d.traceback then
-    stderr:write(d.traceback, '\n')
+  if d.lua_stb then -- Lua stack traceback
+    stderr:write(d.lua_stb, '\n')
   end
-  -- errors may contain an activity trace created by trace()
-  if d.activity_trace then
+  if d.activity_trace then -- activity trace created by trace()
     stderr:write('\n', ESC'yellow', 'Trace:', ESC'clear', '\n')
     for i, msg in ipairs(d.activity_trace) do
       stderr:write((' '):rep(i * 2), msg, '\n')
@@ -238,17 +253,17 @@ end
 local tracing, stack = false, {}
 local function set_tracing(v) tracing = v end
 
--- helper to expand a string based on the upvalues of a function
+-- closure to expand a string using the upvalues of a function
 local _f ; local function _expander(name)
   for i = 1, 9 do -- limited to the first 9 upvalues
-    local n, v = dbg_upvalue(_f, i)
+    local n, v = dbg_getupvalue(_f, i)
     if not n then break
-    elseif n == name then return lstring.format(v) end
+    elseif n == name then return ls_format(v) end
   end
   return nil
 end
 local function expand_up(message, f)
-  _f = f ; return lstring.expand(message, _expander)
+  _f = f ; return ls_expand(message, _expander)
 end
 
 -- Traces a call to f(). If tracing is enabled, msg is expanded with f's
@@ -260,7 +275,7 @@ local function trace(msg, f, ...)
   stack[n + 2] = f
   if tracing then
     if n == 0 then t0 = clock() end -- measure the time of 1st-level calls
-    stderr:write(ESC'clear;blue', (' '):rep(n), expand_up(msg, f), '\n')
+    stderr:write(ESC'clear;blue', (' '):rep(n), expand_up(msg, f), ESC'clear', '\n')
   end
   f(...)
   assert(#stack == n + 2, 'unbalanced activity stack')
@@ -281,7 +296,7 @@ styles.lua_error = {prefix = 'Lua error!', sep = '\n', fg = 'red'}
 local function error_handler(diag)
   -- if this is a regular Lua error, convert it to a diagnostic
   if not is_a(diag) then
-    diag = new{"lua_error: ${1}", diag, traceback = dbg_traceback(nil, 2)}
+    diag = new("lua_error: ${1}", diag):lua_traceback(3)
   end
   -- add the activity stack built by trace()
   if #stack > 0 then
@@ -366,9 +381,9 @@ end
 -- Pretty prints a value to stdout.
 local function pp(value, label)
   if label then
-    io.write(label, ' = ', lstring.format(value), '\n')
+    io.write(label, ' = ', ls_format(value), '\n')
   else
-    io.write(lstring.format(value), '\n')
+    io.write(ls_format(value), '\n')
   end
 end
 

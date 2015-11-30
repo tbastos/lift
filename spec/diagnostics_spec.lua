@@ -5,10 +5,10 @@ describe('lift.diagnostics', function()
   describe('when creating diagnostic objects', function()
 
     it('formats messages by interpolating variables', function()
-      local d = diagnostics.new('remark: lift is awesome!', 1*3, 2*3)
+      local d = diagnostics.new('remark: lift is awesome!', 5, 7)
       assert.equal('remark', d.kind, d.level)
       assert.equal('lift is awesome!', d.message)
-      assert.equal(3, d[1]) assert.equal(6, d[2])
+      assert.equal(5, d[1]) assert.equal(7, d[2])
 
       assert.error(function() diagnostics.new() end,
         "first arg must be a message")
@@ -21,11 +21,11 @@ describe('lift.diagnostics', function()
     it('implements lazy formatting of messages', function()
       local three = diagnostics.new('remark: 3')
       local d = diagnostics.new('warning: ${1} + ${3} is not ${2}',
-        1, '2', three)
+        1, '2', three.message)
       assert.equal('${1} + ${3} is not ${2}', d[0])
       assert.equal('1 + 3 is not 2', d.message)
       local remark = diagnostics.new('remark: Hey, ${1}!', d)
-      assert.equal('Hey, 1 + 3 is not 2!', remark.message)
+      assert.equal('Hey, Warning: 1 + 3 is not 2!', remark.message)
       assert.equal('warning', d.level)
       assert.equal('remark', three.level, remark.level)
     end)
@@ -64,7 +64,7 @@ describe('lift.diagnostics', function()
 
     local ok, err = pcall(diagnostics.report,
       'fatal: ${1} is coming', 'winter')
-    assert.False(ok) assert.equal('winter is coming', tostring(err))
+    assert.False(ok) assert.equal('Error: winter is coming', tostring(err))
 
     -- fail_if_error() raises the latest error diagnostic, if any
     assert.no_error(function() diagnostics.fail_if_error() end)

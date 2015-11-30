@@ -72,8 +72,7 @@ local function _load_file(filename, ...)
   if chunk then
     chunk(...)
   else
-    local tb = debug.traceback(nil, 2)
-    diagnostics.new{'lua_error: ${1}', err, traceback = tb}:report()
+    diagnostics.new('lua_error: ${1}', err):report()
   end
 end
 

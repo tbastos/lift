@@ -39,7 +39,7 @@ local function encode(seq)
   return '\27[' .. str_gsub(seq, '([^;]+)', codes) .. 'm'
 end
 
--- colors are disabled by default, use set_enabled()
+-- colors are disabled by default; use set_enabled()
 local enabled = false
 local function set_enabled(v) enabled = v end
 

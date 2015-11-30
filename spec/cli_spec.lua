@@ -46,7 +46,7 @@ describe('lift.cli', function()
     assert.True(called)
     assert.same(verifier[#verifier],
       diagnostics.new("warning: unused argument '${1}'", 'wasted'))
-    assert.error(function() root:process{'one', 'two'} end,
+    assert.error_matches(function() root:process{'one', 'two'} end,
       'missing argument <three>')
   end)
 
@@ -95,14 +95,14 @@ describe('lift.cli', function()
       root:process{'--x=off', '--Y'}
       assert.equal(false, root:get'x') assert.equal(true, root:get'y')
 
-      assert.error(function() root:process{'--X'} end,
-        'unknown option --X')
+      assert.error_matches(function() root:process{'--X'} end,
+        'unknown option %-%-X')
 
-      assert.error(function() root:process{'--unknown'} end,
-        'unknown option --unknown')
+      assert.error_matches(function() root:process{'--unknown'} end,
+        'unknown option %-%-unknown')
 
-      assert.error(function() root:process{'-x=what'} end,
-        "option -x: expected <bool>, got 'what'")
+      assert.error_matches(function() root:process{'-x=what'} end,
+        "option %-x: expected <bool>, got 'what'")
     end)
 
     it('calls action when a flag is matched', function()
@@ -131,8 +131,8 @@ describe('lift.cli', function()
       assert.equal('key=value', root:get'name')
       assert.equal('X:P:K', root:get'g')
 
-      assert.error(function() root:process{'--g'} end,
-        'option --g: missing argument')
+      assert.error_matches(function() root:process{'--g'} end,
+        'option %-%-g: missing argument')
     end)
 
     it('calls action when an option is matched', function()
@@ -178,8 +178,8 @@ describe('lift.cli', function()
     root:process{'x', 'sub1', '-o=1'}
     assert.equal('', called) ; assert.equal(2, #with)
 
-    assert.error(function() root:process{'sub1', '-o=1', '-o2=2'} end,
-      "unknown option -o2 for command 'sub1'")
+    assert.error_matches(function() root:process{'sub1', '-o=1', '-o2=2'} end,
+      "unknown option %-o2 for command 'sub1'")
 
     sub1:alias 's1'
     root:process{'s1', 'x', '-o=1', '-o1=2', 'sub2'}
@@ -187,8 +187,8 @@ describe('lift.cli', function()
     assert.equal('sub1', called)
     assert.equal(2, #with)
 
-    assert.error(function() root:process{'sub2', '-o1=1'} end,
-      "unknown option -o1 for command 'sub2'")
+    assert.error_matches(function() root:process{'sub2', '-o1=1'} end,
+      "unknown option %-o1 for command 'sub2'")
 
     root:process{'sub2', 'y', '-o', 'x'}
     assert.equal('sub2', called) ; assert.equal(1, #with)

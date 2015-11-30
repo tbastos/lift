@@ -7,7 +7,7 @@ local write = io.write
 local app = ...
 
 local task_cmd = app:command 'task'
-  :desc('task', 'Subcommands to survey and run tasks')
+  :desc('task', 'Subcommands to interface with tasks')
 
 -- task run
 local run_cmd = task_cmd:command 'run'

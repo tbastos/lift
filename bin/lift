@@ -8,6 +8,9 @@ local config = require 'lift.config'
 local loader = require 'lift.loader'
 local diagnostics = require 'lift.diagnostics'
 
+-- enable colors by default on supported terminals
+require('lift.color').set_enabled(os.getenv('TERM') or os.getenv('ANSICON'))
+
 os.exit(diagnostics.wrap(function()
 
   -- parse key=value configs at the beginning of arg list

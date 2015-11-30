@@ -196,6 +196,17 @@ describe("lift.async", function()
       local elapsed  = uv.now() - t0
       assert.equal(n, future.results[1])
       assert.near(n * TOLERANCE, elapsed, TOLERANCE)
+      -- add some errors to the mix
+      local function raise(i)
+        async.sleep(i * TOLERANCE)
+        error('error #'..i)
+      end
+      list[n+1] = async(raise, 1)
+      list[n+2] = async(raise, 2)
+      future = async(main)
+      async.run()
+      assert.matches('caught 2 errors.*error #1.*error #2',
+        tostring(future.error))
     end)
 
   end)

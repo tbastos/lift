@@ -221,12 +221,25 @@ local function wait_any(futures)
   return first
 end
 
+-- used by wait_all() as diagnostic:format()
+local function format_errors(d)
+  local loc, nested = d.location, d.nested
+  local s = loc.file..':'..loc.line..': '..d.message
+  for i = 1, #nested do
+    s = s..'\n  ('..i..') '..tostring(nested[i])
+  end
+  return s
+end
+
 -- Suspends the calling thread until all futures in the list become ready.
--- If at least one future raises an error, wait_all() will raise an error
--- that aggregates all errors raised by the futures.
+-- If at least one future raises an error, wait_all() will raise an aggregate
+-- error (a diagnostic) object that lits all errors raised by the futures.
 local function wait_all(futures)
-  local n, e, this_future = #futures, nil, co_get()
+  local n, errors, this_future = #futures, nil, co_get()
   local function callback(future, err, res)
+    if err then
+      if not errors then errors = {err} else errors [#errors+1] = err end
+    end
     n = n - 1
     if n == 0 then schedule(this_future) end
   end
@@ -236,11 +249,17 @@ local function wait_all(futures)
     f:on_ready(callback)
   end
   if n > 0 then co_yield() end
-  if e then error(e) end
+  if errors then
+    local d = diagnostics.new('fatal: wait_all() caught '):function_location(2)
+    d[0] = d[0]..#errors..(#errors > 1 and ' errors' or ' error')
+    d.nested = errors
+    d.format = format_errors
+    error(d)
+  end
 end
 
 -- Suspends the calling thread until `dt` milliseconds have passed.
--- Returns the elapsed time spent sleeping, also in milliseconds.
+-- Returns the elapsed time spent sleeping, in milliseconds.
 local function sleep(dt)
   local timer, this_future = uv_timer(), co_get()
   timer:start(dt, function() schedule(this_future) end)
