@@ -2,7 +2,7 @@
 -- Asynchronous programming based on coroutines and futures
 ------------------------------------------------------------------------------
 
-local assert, next = assert, next
+local assert, next, rawget = assert, next, rawget
 local setmetatable = setmetatable
 local co_create = coroutine.create
 local co_resume = coroutine.resume
@@ -12,7 +12,10 @@ local co_running = coroutine.running
 local diagnostics = require 'lift.diagnostics'
 local pcall = diagnostics.pcall
 
-local uv = require 'lluv' -- needed for timer callbacks (sleep/timeout)
+-- libuv is needed for timers (sleep/timeout)
+local uv = require 'lluv'
+local uv_run, uv_timer, uv_now = uv.run, uv.timer, uv.now
+local UV_RUN_ONCE = uv.RUN_ONCE
 
 ------------------------------------------------------------------------------
 -- Coroutine (thread) Pool
@@ -20,15 +23,15 @@ local uv = require 'lluv' -- needed for timer callbacks (sleep/timeout)
 
 local coroutines = {} -- list of free coroutines + map{co = future}
 local execute -- called to execute a future
-local on_done -- called with the result of execute, or an error
+local on_done -- called with the results of pcall(execute(future))
 
 -- Reusable coroutine function. Calls execute(future) in cycles.
 local function thread_f(future)
-  while true do
-    local ok, res = pcall(execute, future)
-    on_done(future, ok, res)
-    future = co_yield(res)
-  end
+  ::start::
+  local ok, res = pcall(execute, future)
+  on_done(future, ok, res)
+  future = co_yield(res)
+  goto start
 end
 
 -- Allocates a coroutine to a future. Returns a Lua thread.
@@ -61,27 +64,27 @@ end
 -- Scheduler
 ------------------------------------------------------------------------------
 
-local ready = {}  -- map{future = coroutine/false} of calls ready to run
+local resumable = {}  -- map{future = arg} of threads ready to run
 
--- Schedules a coroutine to be resumed as soon as possible.
-local function set_ready(future, value)
-  ready[future] = value or false
+-- Schedules a coroutine to be resumed with `arg` as soon as possible.
+local function schedule(future, arg)
+  resumable[future] = arg or false
 end
 
 -- Runs all threads until they're either blocked or done.
 local function step()
-  while true do
-    local future, value = next(ready)
-    if not future then return end
-    local co = future.co
-    if not co then -- start a new thread
-      co = co_alloc(future)
-      future.co = co
-    end
-    local ok, err = co_resume(co, value)
-    if not ok then error('error in future:when_done callback: '..tostring(err)) end
-    ready[future] = nil
+  ::start::
+  local future, arg = next(resumable)
+  if not future then return end
+  local co = future.co
+  if not co then -- start a new thread
+    co = co_alloc(future)
+    future.co = co
   end
+  local ok, err = co_resume(co, arg)
+  if not ok then error('error in future:on_ready callback: '..tostring(err)) end
+  resumable[future] = nil
+  goto start
 end
 
 ------------------------------------------------------------------------------
@@ -100,20 +103,14 @@ function Future:__tostring()
   return 'lift.async.Future('..tostring(self.f)..', '..tostring(self.arg)..')'
 end
 
--- Kills a running coroutine. This is dangerous and only meant for tests!
--- Only call you *really* know what you're doing.
-function Future:abort()
-  ready[self] = nil
-  local co = self.co
-  if co then coroutines[co] = nil end
-  local timer = self.timer
-  if timer then timer:close() ; self.timer = nil end
-end
-
 -- Adds a function to be called when the future's thread finishes.
 -- Arguments passed to callback: future, error (or nil), results (table, or nil)
-function Future:when_done(callback)
-  self[#self+1] = callback
+function Future:on_ready(callback)
+  if self.ready then -- call callback immediately
+    callback(self, self.error, rawget(self, 'results'))
+  else
+    self[#self+1] = callback
+  end
 end
 
 -- Called by coroutines to execute a future.
@@ -123,6 +120,7 @@ end
 
 -- Called by coroutines when a future completes execution.
 on_done = function(future, ok, res)
+  future.ready = true
   local cb_err, cb_res -- callback arguments
   if ok then -- future was fulfilled
     cb_res = res
@@ -136,7 +134,7 @@ on_done = function(future, ok, res)
   for i = 1, #future do
     future[i](future, cb_err, cb_res)
   end
-  -- only reuse the coroutine if callbacks didn't raise an error
+  -- only reuse coroutine if callbacks didn't raise errors
   co_free(future.co, future)
 end
 
@@ -148,45 +146,49 @@ end
 -- Returns a future object for interfacing with the async call.
 local function async(f, arg)
   local future = setmetatable({f = f, arg = arg,
-    co = false, results = false}, Future)
-  ready[future] = future
+    co = false, ready = false, results = false}, Future)
+  resumable[future] = future
   return future
 end
 
 -- Runs all async functions to completion. Call this from the main thread.
 local function run()
-  repeat step() until uv.run(uv.RUN_ONCE) == 0
+  repeat step() until uv_run(UV_RUN_ONCE) == 0
   step() -- handles final events
 end
 
--- Suspends the calling thread until `future` is fulfilled, or until `timeout`
+-- Forces run() to stop while there are still threads waiting for events.
+-- May cause leaks and bugs. Only call if you want to terminate the application.
+local function stop()
+  uv.handles(function(handle) handle:close() end)
+end
+
+-- Suspends the calling thread until `future` becomes ready, or until `timeout`
 -- milliseconds have passed. The timeout is optional, and if specified it
 -- should be a positive integer. If the future is fulfilled, wait() returns
 -- true and the future's results table; if wait() times out, it returns false.
--- If the future raises an error, wait() raises the error.
+-- If the future raises an error, wait() propagates the error.
 local function wait(future, timeout)
   local results = future.results
   if results then return true, results end
   local this_future = co_get()
   if future == this_future then error('future cannot wait for itself', 2) end
   if timeout then
-    local timer = uv.timer()
-    this_future.timer = timer
+    local timer = uv_timer()
     local function callback(future_or_timer, err, res)
       if timer == nil then return end -- ignore second call
       if future_or_timer == timer then res = 'timed out' end
-      set_ready(this_future, res)
+      schedule(this_future, res)
       timer:close()
       timer = nil
-      this_future.timer = nil
     end
     timer:start(timeout, callback)
-    future:when_done(callback)
+    future:on_ready(callback)
     results = co_yield()
     if results == 'timed out' then return false end
   else
-    future:when_done(function(_, err, res)
-      set_ready(this_future, res)
+    future:on_ready(function(_, err, res)
+      schedule(this_future, res)
     end)
     results = co_yield()
   end
@@ -194,55 +196,58 @@ local function wait(future, timeout)
   return true, results
 end
 
--- Suspends the calling thread until one future in the list finishes execution.
+-- Suspends the calling thread until one future from the list becomes ready.
 -- Either returns the first fulfilled future, or raises the first raised error.
 local function wait_any(futures)
-  local e, this_future = nil, co_get()
-  local function callback(future, err, res)
-    e = err
-    set_ready(this_future, future)
-  end
-  for i = 1, #futures do
+  -- first we check if any future is currently ready
+  local n, this_future = #futures, co_get()
+  for i = 1, n do
     local f = futures[i]
     if f == this_future then error('future cannot wait for itself', 2) end
-    f:when_done(callback)
+    if f.results then return f end -- this will also raise any error
+  end
+  local done, first_err = false
+  local function callback(future, err, res)
+    if done then return end
+    done = true
+    first_err = err
+    schedule(this_future, future)
+  end
+  for i = 1, n do
+    futures[i]:on_ready(callback)
   end
   local first = co_yield()
-  if e then error(e) end
+  if first_err then error(first_err) end
   return first
 end
 
--- Suspends the calling thread until all futures in the list finish execution.
--- Raises an error if at least one future raises an error. In this case, the
--- raised error aggregates all errors raised by the listed futures.
+-- Suspends the calling thread until all futures in the list become ready.
+-- If at least one future raises an error, wait_all() will raise an error
+-- that aggregates all errors raised by the futures.
 local function wait_all(futures)
   local n, e, this_future = #futures, nil, co_get()
   local function callback(future, err, res)
-    if n == 1 then set_ready(this_future) end
     n = n - 1
+    if n == 0 then schedule(this_future) end
   end
   for i = 1, n do
     local f = futures[i]
     if f == this_future then error('future cannot wait for itself', 2) end
-    f:when_done(callback)
+    f:on_ready(callback)
   end
-  co_yield()
+  if n > 0 then co_yield() end
   if e then error(e) end
 end
 
--- Suspends the current coroutine and resumes milliseconds later.
--- Returns the time spent sleeping, in milliseconds.
-local function sleep(milliseconds)
-  local timer, this_future = uv.timer(), co_get()
-  this_future.timer = timer
-  timer:start(milliseconds, function()
-    set_ready(this_future)
-  end)
-  local t0 = uv.now()
+-- Suspends the calling thread until `dt` milliseconds have passed.
+-- Returns the elapsed time spent sleeping, also in milliseconds.
+local function sleep(dt)
+  local timer, this_future = uv_timer(), co_get()
+  timer:start(dt, function() schedule(this_future) end)
+  local t0 = uv_now()
   co_yield()
   timer:close()
-  this_future.timer = nil
-  return uv.now() - t0
+  return uv_now() - t0
 end
 
 ------------------------------------------------------------------------------
@@ -253,6 +258,7 @@ return setmetatable({
   async = async,
   run = run,
   sleep = sleep,
+  stop = stop,
   wait = wait,
   wait_all = wait_all,
   wait_any = wait_any,
