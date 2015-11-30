@@ -231,7 +231,7 @@ local function wait_all(futures)
 end
 
 -- Suspends the current coroutine and resumes milliseconds later.
--- Returns the time spent sleeping and the current timestamp, in milliseconds.
+-- Returns the time spent sleeping, in milliseconds.
 local function sleep(milliseconds)
   local timer, this_future = uv.timer(), co_get()
   this_future.timer = timer
@@ -240,10 +240,9 @@ local function sleep(milliseconds)
   end)
   local t0 = uv.now()
   co_yield()
-  local now = uv.now()
   timer:close()
   this_future.timer = nil
-  return now - t0, now
+  return uv.now() - t0
 end
 
 ------------------------------------------------------------------------------
