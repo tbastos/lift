@@ -41,7 +41,7 @@ install:
   - set PATH=%PATH%;%LIBUV%
 
 build_script:
-  - luarocks install lluv UV_DIR=%LIBUV% UV_LIBDIR=%LIBUV%
+  - luarocks install lluv "UV_DIR=%LIBUV%" "UV_LIBDIR=%LIBUV%"
   - luarocks install busted
   - echo %PATH%
   - busted -v --no-auto-insulate --filter-out=async # tests using libuv hang on appveyor
