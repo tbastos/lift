@@ -160,7 +160,7 @@ describe('lift.cli', function()
 
   end)
 
-  it('supports subcommand hierarchies and command aliases', function()
+  it('supports subcommand hierarchies, command aliases and delegates', function()
     local called, with
     local function spy(cmd) called = cmd.name ; with = cmd.args end
     root:action(spy):option('o')
@@ -203,6 +203,14 @@ describe('lift.cli', function()
     assert.equal('2', root:get'o') ; assert.equal('3', sub1:get'o1')
     assert.equal('4', sub3:get'o') ; assert.equal('sub1 sub3 sub4', called)
     assert.equal(1, #with) ; assert.equal('5', sub4:get'o')
+
+    -- delegate 'del' to 'sub1 sub3 sub4'
+    called = nil
+    root:command('del'):delegate_to(root:get_command'sub1 sub3 sub4')
+    root:process{'del'}
+    assert.equal('sub1 sub3 sub4', called)
+    assert.error_matches(function() root:delegate_to('sub1') end,
+      "expected a command object, got string")
   end)
 
   it("checks for name clashes", function()
@@ -229,6 +237,13 @@ describe('lift.cli', function()
     it("implements --help", function()
       local _, out = diagnostics.capture(function()
         root:process{'--help'}
+      end)
+      assert.match("Use 'lift help <command>' to read about a subcommand", out)
+    end)
+
+    it("implements help command", function()
+      local _, out = diagnostics.capture(function()
+        root:process{'help help'}
       end)
       assert.match("^Usage:.* help .* Print help for one command and exit", out)
     end)

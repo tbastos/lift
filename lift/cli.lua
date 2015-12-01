@@ -102,7 +102,7 @@ local function delegate(delegator)
 end
 function Command:delegate_to(other_command)
   if getmetatable(other_command) ~= Command then
-    error('expected a command object, got'..tostring(other_command), 2)
+    error('expected a command object, got '..type(other_command), 2)
   end
   self.delegatee = other_command
   return self:action(delegate)

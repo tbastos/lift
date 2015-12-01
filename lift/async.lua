@@ -26,11 +26,11 @@ local on_done -- called with the results of pcall(execute(future))
 
 -- Reusable coroutine function. Calls execute(future) in cycles.
 local function thread_f(future)
-  ::start::
-  local ok, res = pcall(execute, future)
-  on_done(future, ok, res)
-  future = co_yield(res)
-  goto start
+  while true do
+    local ok, res = pcall(execute, future)
+    on_done(future, ok, res)
+    future = co_yield(res)
+  end
 end
 
 -- Allocates a coroutine to a future. Returns a Lua thread.
@@ -72,18 +72,18 @@ end
 
 -- Runs all threads until they're either blocked or done.
 local function step()
-  ::start::
-  local future, arg = next(resumable)
-  if not future then return end
-  local co = future.co
-  if not co then -- start a new thread
-    co = co_alloc(future)
-    future.co = co
+  while true do
+    local future, arg = next(resumable)
+    if not future then return end
+    local co = future.co
+    if not co then -- start a new thread
+      co = co_alloc(future)
+      future.co = co
+    end
+    local ok, err = co_resume(co, arg)
+    if not ok then error('error in future:on_ready callback: '..tostring(err)) end
+    resumable[future] = nil
   end
-  local ok, err = co_resume(co, arg)
-  if not ok then error('error in future:on_ready callback: '..tostring(err)) end
-  resumable[future] = nil
-  goto start
 end
 
 ------------------------------------------------------------------------------
