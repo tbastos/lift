@@ -26,8 +26,8 @@ cache:
   - c:\lua -> .ci\appveyor.yml
   - c:\external -> .ci\appveyor.yml
 
-init:
-  - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+# init:
+#   - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
 
 install:
   - call .ci\set_compiler_env.bat
@@ -37,13 +37,11 @@ install:
   - appveyor DownloadFile http://dist.libuv.org/dist/v%LIBUV_VERSION%/libuv-%ARCH%-v%LIBUV_VERSION%.build7.exe
   - libuv-%ARCH%-v%LIBUV_VERSION%.build7.exe /NCRC /S
   - ps: if ($env:ARCH -eq "x64") {$env:LIBUV="$Env:ProgramFiles\libuv"} else {$env:LIBUV="${env:ProgramFiles(x86)}\libuv"}
-  - dir "%LIBUV%"
   - set PATH=%PATH%;%LIBUV%
 
 build_script:
   - luarocks install lluv "UV_DIR=%LIBUV%" "UV_LIBDIR=%LIBUV%"
   - luarocks install busted
-  - echo %PATH%
   - busted -v
   - luarocks make rocks/lift-scm-0.rockspec
   - lift --help
