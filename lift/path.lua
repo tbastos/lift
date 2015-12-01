@@ -20,7 +20,7 @@ local LIST_ELEM_PATT = '([^'..LIST_SEPS..']+)['..LIST_SEPS..']*'
 local LIST_SEPS_PATT = '['..LIST_SEPS..']+'
 
 ------------------------------------------------------------------------------
--- OS abstraction functions (on top of LFS)
+-- OS abstraction functions (on top of libuv)
 ------------------------------------------------------------------------------
 
 -- Converts each system-specific path separator to '/'.
@@ -33,16 +33,24 @@ local function from_slash(path)
   return DIR_SEP == '/' and path or path:gsub('/', DIR_SEP)
 end
 
+local uv = require 'lluv'
+local uv_mkdir, uv_rmdir = uv.fs_mkdir, uv.fs_rmdir
+local uv_cwd, uv_stat, uv_scandir = uv.cwd, uv.fs_stat, uv.fs_scandir
 
-local lfs = require 'lfs'
-local __cwd, __dir, __stat = lfs.currentdir, lfs.dir, lfs.attributes
+local function cwd() return to_slash(uv_cwd()) end
+local function stat(path) return uv_stat(from_slash(path)) end
+local function mkdir(path) return uv_mkdir(from_slash(path), 493) end -- 493 = 0755
+local function rmdir(path) return uv_rmdir(from_slash(path)) end
 
-local function cwd() return to_slash(__cwd()) end
-local function read_dir(path) return __dir(from_slash(path)) end
-local function mkdir(path) return lfs.mkdir(from_slash(path)) end
-local function rmdir(path) return lfs.rmdir(from_slash(path)) end
-local function stat(path, attr)
-  return __stat(from_slash(path), attr or 'mode')
+local Dir = {}
+Dir.__index = Dir
+function Dir:next() local i = self.i or 0; i = i + 1; self.i = i; return self[i] end
+function Dir:close() end
+
+local function scan_dir(path)
+  -- TODO rewrite glob using coroutines and libuv
+  -- this is temporary hack (adapter)
+  return setmetatable(uv_scandir(from_slash(path)), Dir)
 end
 
 ------------------------------------------------------------------------------
@@ -164,12 +172,14 @@ end
 
 -- Returns true if path exists and is a directory.
 local function is_dir(path)
-  return stat(path, 'mode') == 'directory'
+  local t = stat(path)
+  return t and t.is_directory or false
 end
 
 -- Returns true if path exists and is a file.
 local function is_file(path)
-  return stat(path, 'mode') == 'file'
+  local t = stat(path)
+  return t and t.is_file or false
 end
 
 -- Recursively creates the set of nested directories defined by path.
@@ -220,7 +230,7 @@ local function init(c, t, i) -- i = number of valid elements in t
   end
   if type(c) == 'table' then return next_l, 0 end -- list
   if str_find(c, '[*?[]') then -- pattern
-    local _, dir_obj = read_dir(path) ; return next_p, dir_obj
+    local dir_obj = scan_dir(path) ; return next_p, dir_obj
   end
   return next_s, c -- string
 end
@@ -336,9 +346,9 @@ local M = {
   make = make,
   mkdir = mkdir,
   match = match,
-  read_dir = read_dir,
   rel = rel,
   rmdir = rmdir,
+  scan_dir = scan_dir,
   split = split,
   split_list = split_list,
   to_slash = to_slash,

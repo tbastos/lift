@@ -1,4 +1,4 @@
-describe("lift.async", function()
+expose("lift.async", function()
 
   local uv = require 'lluv'
   local async = require 'lift.async'

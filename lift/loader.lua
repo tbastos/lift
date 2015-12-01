@@ -9,7 +9,7 @@ local path = require 'lift.path'
 local config = require 'lift.config'
 local diagnostics = require 'lift.diagnostics'
 
-local is_dir, is_file, read_dir = path.is_dir, path.is_file, path.read_dir
+local is_dir, is_file, scan_dir = path.is_dir, path.is_file, path.scan_dir
 
 -- Returns an iterator over the Lua files in the ${load_path} that follow
 -- a certain naming convention and match the 'type' and 'subtype' strings.
@@ -23,27 +23,27 @@ local function find_scripts(type, subtype, reverse_order)
   local load_path = config:get_list('load_path')
   local patt = '^'..type..'(_?)('..subtype..')%.lua$'
   local subpatt = '^'..subtype..'(_?)(.*)%.lua$'
-  local i = (reverse_order and #load_path or 1)
-  local dir, dir_obj, subdir, subdir_obj
+  local i, si = (reverse_order and #load_path or 1), reverse_order and -1 or 1
+  local dir, dir_names, dir_i, subdir, sub_names, sub_i
   return function()
-    local _, _name, _e, _sep, _sub -- temp vars
+    local _, _name, _e, _sep, _sub
     if subdir then goto iterate_subdir end
     if dir then goto iterate_dir end
 
     ::iterate_load_path::
     dir = load_path[i]
     if not dir then return nil end
-    i = i + (reverse_order and -1 or 1)
-    _, dir_obj = read_dir(dir)
+    i = i + si
+    dir_i, dir_names = 1, scan_dir(dir)
 
     ::iterate_dir::
-    _name = dir_obj:next()
+    _name = dir_names[dir_i] ; dir_i = dir_i + 1
     if not _name then goto iterate_load_path end
     if _name == type then
       _name = dir..'/'.._name
       if is_dir(_name) then
         subdir = _name
-        _, subdir_obj = read_dir(subdir)
+        sub_i, sub_names = 1, scan_dir(subdir)
         goto iterate_subdir
       end
     else
@@ -56,7 +56,7 @@ local function find_scripts(type, subtype, reverse_order)
     goto iterate_dir
 
     ::iterate_subdir::
-      _name = subdir_obj:next()
+      _name = sub_names[sub_i] ; sub_i = sub_i + 1
       if not _name then subdir = nil goto iterate_dir end
       _, _e, _sep, _sub = str_find(_name, subpatt)
       if _e and (_sub == '' or _sep == '_') then

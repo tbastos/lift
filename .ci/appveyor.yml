@@ -39,7 +39,7 @@ install:
 build_script:
   - luarocks install lluv UV_DIR=%LIBUV% UV_LIBDIR=%LIBUV%
   - luarocks install busted
-  - busted -v --filter-out=async # tests using libuv hang on appveyor for some reason
+  - busted -v #--filter-out=async # tests using libuv hang on appveyor for some reason
   - luarocks make rocks/lift-scm-0.rockspec
   - lift --help
 

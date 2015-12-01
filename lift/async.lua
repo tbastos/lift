@@ -12,7 +12,6 @@ local co_running = coroutine.running
 local diagnostics = require 'lift.diagnostics'
 local pcall = diagnostics.pcall
 
--- libuv is needed for timers (sleep/timeout)
 local uv = require 'lluv'
 local uv_run, uv_timer, uv_now = uv.run, uv.timer, uv.now
 local UV_RUN_ONCE = uv.RUN_ONCE
