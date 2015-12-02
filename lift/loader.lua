@@ -25,22 +25,22 @@ local function find_scripts(type, subtype, reverse_order)
   local subpatt = '^'..subtype..'(_?)(.*)%.lua$'
   local i, si = (reverse_order and #load_path or 1), reverse_order and -1 or 1
   local dir, dir_names, dir_i, subdir, sub_names, sub_i
-  return function() -- goto's have made this code simpler!
+  return function() -- goto's made this code simpler!
     local _, _name, _e, _sep, _sub
-    if subdir then goto iterate_subdir end
-    if dir then goto iterate_dir end
+    if subdir then goto ITERATE_SUBDIR end
+    if dir then goto ITERATE_DIR end
 
-    ::iterate_load_path:: dir = load_path[i] ; i = i + si
+    ::ITERATE_LOAD_PATH:: dir = load_path[i] ; i = i + si
     if not dir then return nil end
     dir_i, dir_names = 1, scan_dir(dir)
 
-    ::iterate_dir:: _name = dir_names[dir_i] ; dir_i = dir_i + 1
-      if not _name then goto iterate_load_path end
+    ::ITERATE_DIR:: _name = dir_names[dir_i] ; dir_i = dir_i + 1
+      if not _name then goto ITERATE_LOAD_PATH end
       if _name == type then
         _name = dir..'/'.._name
         if is_dir(_name) then
           subdir, sub_i, sub_names = _name, 1, scan_dir(_name)
-          goto iterate_subdir
+          goto ITERATE_SUBDIR
         end
       else
         _, _e, _sep, _sub = str_find(_name, patt)
@@ -49,16 +49,16 @@ local function find_scripts(type, subtype, reverse_order)
           if is_file(_name) then return _name end
         end
       end
-    goto iterate_dir
+    goto ITERATE_DIR
 
-    ::iterate_subdir:: _name = sub_names[sub_i] ; sub_i = sub_i + 1
-      if not _name then subdir = nil goto iterate_dir end
+    ::ITERATE_SUBDIR:: _name = sub_names[sub_i] ; sub_i = sub_i + 1
+      if not _name then subdir = nil goto ITERATE_DIR end
       _, _e, _sep, _sub = str_find(_name, subpatt)
       if _e and (_sub == '' or _sep == '_') then
         _name = subdir..'/'.._name
         if is_file(_name) then return _name end
       end
-    goto iterate_subdir
+    goto ITERATE_SUBDIR
   end
 end
 

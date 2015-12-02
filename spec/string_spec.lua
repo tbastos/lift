@@ -52,20 +52,22 @@ describe('lift.string', function()
   it('offers from_glob() to convert glob patterns to Lua patterns', function()
     assert.equal('/some/file%.ext', str.from_glob('/some/file.ext'))
     assert.equal('/[^/]*/file%.xy[^/]', str.from_glob('/*/file.xy?'))
-    assert.equal('/[a-zA-Z]/file_[%w]', str.from_glob('/[a-zA-Z]/file_[%w]'))
+    assert.equal('/.*/[^/]*%.lua', str.from_glob('/**/*.lua'))
+    assert.equal('/[^/]*[^/]*%.lua', str.from_glob('/**.lua'))
+    assert.equal('/[a-zA-Z]/file_[?]%.cool', str.from_glob('/[a-zA-Z]/file_[?].cool'))
   end)
 
-  it('offers expand() to interpolate strings containing ${vars}', function()
+  it('offers expand() to interpolate ${vars} in strings', function()
     local xp = str.expand
     assert.equal('Hello, world!', xp('${1}, ${2}!', {'Hello', 'world'}))
-    assert.equal('$a = $b != ${c}',xp('$${1} = ${2} != ${c}', {'a', '$b'}))
+    assert.equal('$a = $b != ${MISSING:c}',
+      xp('$${1} = ${2} != ${c}', {'a', '$b'}))
     assert.equal('Hey Joe!', xp('${hey} ${name}!', {hey='Hey', name='Joe'}))
-  end)
-
-  it('offers expand_list() to expand a list of strings', function()
-    local list = {'This is ${name}', 'v${num}', 1+2, '${invalid}'}
-    assert.same({'This is lift', 'v1', '3', '${invalid}'},
-      str.expand_list(list, { name = 'lift', num = 1 }))
+    -- with recursive expansions
+    assert.equal('five = 5', xp('${2+3} = ${${${2}+${3}}}',
+      {1,2,3,4, ['2+3'] = 'five', five = 5}))
+    -- with custom var function
+    assert.equal('2,3,4', xp('${1},${2},${3}', nil, function(t, v) return v+1 end))
   end)
 
   it("offers format_value()", function()

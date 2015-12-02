@@ -253,17 +253,16 @@ end
 local tracing, stack = false, {}
 local function set_tracing(v) tracing = v end
 
--- closure to expand a string using the upvalues of a function
-local _f ; local function _expander(name)
+-- expand_up(msg, f) expands vars using the upvalues of a function
+local function get_upvalue(f, name)
   for i = 1, 9 do -- limited to the first 9 upvalues
-    local n, v = dbg_getupvalue(_f, i)
+    local n, v = dbg_getupvalue(f, i)
     if not n then break
     elseif n == name then return ls_format(v) end
   end
-  return nil
 end
 local function expand_up(message, f)
-  _f = f ; return ls_expand(message, _expander)
+  return ls_expand(message, f, get_upvalue)
 end
 
 -- Traces a call to f(). If tracing is enabled, msg is expanded with f's

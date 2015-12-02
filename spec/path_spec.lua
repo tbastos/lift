@@ -113,15 +113,43 @@ describe('lift.path', function()
     assert.False(path.match('/dir/file.ext', '*file*'))
   end)
 
-  it('make() to create directory hierarchies', function()
+  it('mkdir_all() to create dirs with missing parents', function()
     assert.no_error(function()
-      assert(path.make'sub1/sub2')
+      assert(path.mkdir_all'sub1/sub2')
       assert(path.rmdir('sub1/sub2'))
       assert(path.rmdir('sub1'))
     end)
   end)
 
-  describe('when globbing for files', function()
+  describe('file globbing', function()
+    local vars = {
+      name = 'fname',
+      path = {'/var', '/usr/local/var'},
+      exts = {'png', 'jpg'},
+    }
+
+    it("accepts **, *, ?, [charsets] and n-fold variable expansions", function()
+      -- parsing of glob patterns
+      assert.same({'[^/]*%.lua'}, path.glob_parse('*.lua', vars))
+      assert.same({'[^/]*/', 'fname', '%.lua'}, path.glob_parse('*/${name}.lua', vars))
+      assert.same({'[^/]*/', 'fname', '%.', vars.exts},
+        path.glob_parse('*/${name}.${exts}', vars))
+      -- product of vars in glob patterns
+      local list = {} ; local function collect(v) list[#list+1] = v end
+      path.glob_product(path.glob_parse('*.lua', vars), collect)
+      assert.same({'[^/]*%.lua'}, list)
+      list = {}
+      path.glob_product(path.glob_parse('${name}.lua', vars), collect)
+      assert.same({'fname%.lua'}, list)
+      list = {}
+      path.glob_product(path.glob_parse('${name}.${exts}', vars), collect)
+      assert.same({'fname%.png', 'fname%.jpg'}, list)
+      list = {}
+      path.glob_product(path.glob_parse('${path}/${name}.${exts}', vars), collect)
+      assert.same({'/var/fname%.png', '/var/fname%.jpg',
+        '/usr/local/var/fname%.png', '/usr/local/var/fname%.jpg'}, list)
+    end)
+
     -- counts how many files a glob() matched
     local function count_glob(...)
       local it, n = path.glob(...), 0

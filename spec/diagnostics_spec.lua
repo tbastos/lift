@@ -33,7 +33,7 @@ describe('lift.diagnostics', function()
     it('alternatively accepts a list in the constructor', function()
       local d = diagnostics.new({'remark: ${1}${2}${3} ${4}${5}',
         1, '2', 3}, 4, 5)
-      assert.equal('123 ${4}${5}', d.message) -- varargs are lost
+      assert.equal('123 ${MISSING:4}${MISSING:5}', d.message)
     end)
 
   end)

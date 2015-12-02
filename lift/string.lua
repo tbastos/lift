@@ -10,6 +10,8 @@ local str_sub = string.sub
 local str_upper = string.upper
 local tbl_concat = table.concat
 local keys_sorted_by_type = require('lift.utils').keys_sorted_by_type
+local lpeg = require 'lpeg'
+local P, R, V, Ca, Cs = lpeg.P, lpeg.R, lpeg.V, lpeg.Carg, lpeg.Cs
 
 -- Returns the Capitalized form of a string
 local function capitalize(str)
@@ -51,54 +53,48 @@ local function escape_magic(str)
   return (str_gsub(str, '[$^%().[%]*+-?]', '%%%1'))
 end
 
--- Converts a file 'globbing' pattern to a Lua pattern. Supports '*',
--- '?' and Lua-style [] character sets. Does not support escaping.
-local magic_translation = { ['^'] = '%^', ['$'] = '%$', ['%'] = '%%',
+-- Converts a file globbing pattern to a Lua pattern. Supports '**/', '*', '?'
+-- and Lua-style [character sets]. Note that '**' must always precede a '/'.
+-- Does not support escaping with '\', use charsets instead: '[*?]'.
+local glob_to_lua = { ['^'] = '%^', ['$'] = '%$', ['%'] = '%%',
   ['('] = '%(', [')'] = '%)', ['.'] = '%.', ['['] = '%[', [']'] = '%]',
   ['+'] = '%+', ['-'] = '%-', ['?'] = '[^/]', ['*'] = '[^/]*' }
 local function from_glob(glob)
-  -- copy [] char sets verbatim; translate magic chars everywhere else
-  local init, res = 1, ''
-  while init do
-    local s, e, cs = str_find(glob, '(%[.-%])', init)
-    local str = str_sub(glob, init, s and s - 1)
-    res = res..str_gsub(str, '[$^%().[%]*+-?]', magic_translation)..(cs or '')
-    init = e and e + 1
-  end
-  return res
+  -- copy [charsets] verbatim; translate magic chars everywhere else
+  local i, res = 1, ''
+  repeat
+    local s, e, charset = str_find(glob, '(%[.-%])', i)
+    local before = str_sub(glob, i, s and s - 1)
+    res = res..str_gsub(before, '[$^%().[%]*+-?]', glob_to_lua)..(charset or '')
+    i = e and e + 1
+  until not i
+  -- handle '**/' as a last gsub pass
+  return (str_gsub(res, '%[^/]%*%[^/]%*/', '.*/'))
 end
 
 ------------------------------------------------------------------------------
--- String Interpolation
+-- String Interpolation (recursive variable expansions using LPeg)
 ------------------------------------------------------------------------------
 
--- expander: helper function that converts single-digit string indices
--- tonumber() and returns all valid values converted tostring().
-local digits, _env = {}, nil
-for i = 1, 9 do digits[tostring(i)] = i end
-local function expander(k)
-  local v = _env[(digits[k] or k)] ; return v and tostring(v)
+local VB, VE = P'${', P'}'
+local INTEGER = R'09'^1 / tonumber
+local function map_var(f, m, k)
+  local v = f(m, k)
+  if not v then v = '${MISSING:'..k..'}' end
+  return tostring(v)
 end
+local Xpand = P{
+  Cs( (1-VB)^0 * V'Str' * P(1)^0 ),
+  Str = ( (1-VB-VE)^1 + V'Var' )^1,
+  Var = Ca(1) * Ca(2) * VB * (INTEGER*VE + Cs(V'Str')*VE) / map_var
+}
 
--- Expands ${vars} using a mapping function or table
-local function expand(str, map)
-  local previous = _env
-  if type(map) ~= 'function' then _env, map = map, expander end
-  str = str_gsub(str, '%${([^}]+)}', map)
-  _env = previous
-  return str
-end
+local function index_table(t, k) return t[k] end -- default var_f
 
--- Expands all list elements in-place, automatically converting
--- non-string elements to string. Returns the same list.
-local function expand_list(list, map)
-  local previous = _env
-  if type(map) ~= 'function' then _env, map = map, expander end
-  for i = 1, #list do
-    list[i] = str_gsub(tostring(list[i]), '%${([^}]+)}', map)
-  end
-  _env = previous
-  return list
+-- Replaces '${vars}' with the result of var_f(var_table, 'varname').
+-- If var_f is omitted, var_table must be a table with string/integer keys.
+local function expand(str, var_table, var_f)
+  return lpeg.match(Xpand, str, nil, var_f or index_table, var_table) or str
 end
 
 ------------------------------------------------------------------------------
@@ -232,7 +228,6 @@ local M = {
   decamelize = decamelize,
   escape_magic = escape_magic,
   expand = expand,
-  expand_list = expand_list,
   format = format,
   format_flat_list = format_flat_list,
   format_flat_table = format_flat_table,

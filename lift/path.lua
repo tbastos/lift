@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------------
--- Directory and File Path Manipulation Routines
+-- Directory and file path manipulation routines
 ------------------------------------------------------------------------------
 
 local assert, load, tostring, type = assert, load, tostring, type
@@ -9,8 +9,7 @@ local str_match, str_gmatch = string.match, string.gmatch
 local str_sub, str_find, str_gsub = string.sub, string.find, string.gsub
 local from_glob = require('lift.string').from_glob
 
--- bypass mutual dependency with lift.config
-local config
+local config -- required at the end, to solve circular dependencies
 
 -- OS-specific constants
 local DIR_SEP = assert(package.config:sub(1, 1))
@@ -182,33 +181,91 @@ local function is_file(path)
   return t and t.is_file or false
 end
 
--- Recursively creates the set of nested directories defined by path.
--- Does not throw an error if any of the dirs already exists.
-local function _make(path)
+-- Creates a directory named `path` along with any necessary parents.
+local function _mkdir_all(path)
   if not is_dir(path) then
-    _make(dir(path)) -- make ancestors
+    _mkdir_all(dir(path)) -- create ancestors
     return mkdir(path)
   end
 end
-local function make(path)
+local function mkdir_all(path)
   path = clean(path)
-  local ok, err = _make(path)
-  return (ok and path), err -- clean path on success, or nil + err
+  local ok, err = _mkdir_all(path)
+  return (ok and path), err -- clean path on success, nil + err otherwise
 end
 
--- Returns true if path matches the glob pattern.
+------------------------------------------------------------------------------
+-- Globbing with wildcards, [charsets] and n-fold ${variable} expansions
+------------------------------------------------------------------------------
+
+local function index_table(t, k) return t[k] end -- default var_f
+
+-- Creates a path pattern table from a `glob` string.  Accepts **, *, ?,
+-- [charsets] and ${variables}. Beware: a '**' can only be adjacent to '/'s.
+-- A 'path pattern' is a list where each elem is either a string or a list.
+local function glob_parse(glob, var_table, var_f)
+  var_table, var_f = var_table or config, var_f or index_table
+  local pt, n, i = {}, 0, 1 -- pattern table, #pt, position in glob
+  while true do
+    local s, e, name = str_find(glob, '${([^}]+)}', i)
+    if not s or i < s then -- add string before ${var}, or the last string
+      local str = str_sub(glob, i, s and s - 1)
+      if str ~= '' then n = n + 1 ; pt[n] = from_glob(str) end
+      if not s then return pt end
+    end
+    local v = var_f(var_table, name)
+    if not v then error('no such variable ${'..name..'}', 2) end
+    -- if the var is a string containing LIST_SEPS, convert it to a list
+    if type(v) == 'string' and str_find(v, LIST_SEPS_PATT) then
+      local list, li = {}, 0
+      for str in split_list(v) do li = li + 1 ; list[li] = str end
+      v = list
+    end
+    local vt = type(v)
+    if vt == 'table' and #v == 1 then v, vt = v[1], nil end
+    if vt ~= 'table' then v = tostring(v or '{empty}') end
+    n = n + 1 ; pt[n] = v ; i = e + 1
+  end
+end
+
+-- Computes all possible expansions of the path pattern 'pt' (the product
+-- of its list variables) and calls `callback` with each resulting string.
+local function _product(pt, t, i, n, callback)
+  while i <= n do
+    local v = pt[i]
+    local vt = type(v)
+    if vt == 'table' then
+      for k = 1, #v do
+        t[i] = v[k]
+        _product(pt, t, i + 1, n, callback)
+      end
+      return
+    end
+    i = i + 1
+  end
+  callback(tbl_concat(t))
+end
+local function glob_product(pt, callback)
+  local n = #pt ; if n == 1 then return callback(pt[1]) end -- optimization
+  local t = {} ; for i = 1, n do t[i] = pt[i] end
+  _product(pt, t, 1, n, callback)
+end
+
+-- Returns whether the `path` string matches the `glob` pattern. Supports
+-- wildcards (**/, *, ?), [charsets], and n-fold ${variable} expansions.
+-- A '**' matches zero or more directories and subdirectories.
+-- A '*' matches zero or more characters (but never '/').
+-- A '?' matches any single character (but not '/').
+-- A [set] matches a character in the set (use [^set] for set complement).
+-- All ${vars} are expanded and matched as plain strings (no patterns), except
+-- when the variable is a list. For lists, we iterate all elements (as plain
+-- strings) and test whether any element can be used to match the path.
 local function match(path, glob)
   if not glob then error('missing glob pattern', 2) end
   return str_match(path, '^'..from_glob(glob)..'$') ~= nil
 end
 
-------------------------------------------------------------------------------
--- Globbing patterns with ${var} expansion and n-fold ${list} products
-------------------------------------------------------------------------------
--- Based on auto-generated "closure" iterator factories for efficiency.
--- Each factory handles a pattern with a specific number of components.
--- A component is either: a string, a list, or a glob pattern.
-
+-- GLOB
 local function next_s(str, state) return state, nil end
 local function next_l(list, i)
   if i >= #list then return end
@@ -338,14 +395,16 @@ local M = {
   ext = ext,
   from_slash = from_slash,
   glob = glob,
+  glob_parse = glob_parse,
+  glob_product = glob_product,
   is_abs = is_abs,
   is_dir = is_dir,
   is_file = is_file,
   is_root = is_root,
   join = join,
-  make = make,
-  mkdir = mkdir,
   match = match,
+  mkdir = mkdir,
+  mkdir_all = mkdir_all,
   rel = rel,
   rmdir = rmdir,
   scan_dir = scan_dir,
