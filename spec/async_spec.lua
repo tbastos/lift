@@ -5,7 +5,7 @@ expose("lift.async", function()
 
   local TOLERANCE = 20 -- time tolerance for timer callbacks
   if os.getenv('CI') then
-    TOLERANCE = 40 -- increase tolerance in CI build servers
+    TOLERANCE = 50 -- increase tolerance in CI build servers
   end
 
   it("offers run() to run all async functions to completion", function()
@@ -117,10 +117,10 @@ expose("lift.async", function()
     end)
 
     it("can wait() for a coroutine with a timeout", function()
-      local function short_task() async.sleep(20) return 1 end
-      local function long_task() async.sleep(60) return 2 end
-      local function patient_wait(future) return async.wait(future, 80) end
-      local function impatient_wait(future) return async.wait(future, 40) end
+      local function short_task() async.sleep(TOLERANCE) return 1 end
+      local function long_task() async.sleep(3*TOLERANCE) return 2 end
+      local function patient_wait(future) return async.wait(future, 4*TOLERANCE) end
+      local function impatient_wait(future) return async.wait(future, 2*TOLERANCE) end
       -- successfully wait for a short task
       local f = async(impatient_wait, async(short_task))
       async.run()
