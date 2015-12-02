@@ -205,12 +205,17 @@ local function index_table(t, k) return t[k] end -- default var_f
 -- A 'path pattern' is a list where each elem is either a string or a list.
 local function glob_parse(glob, var_table, var_f)
   var_table, var_f = var_table or config, var_f or index_table
-  local pt, n, i = {}, 0, 1 -- pattern table, #pt, position in glob
+  local pt, n, i = {}, 0, 1 -- pattern table, #pt, pos in glob
+  local lstr -- last added string (or nil if pt[n] is not a string)
   while true do
     local s, e, name = str_find(glob, '${([^}]+)}', i)
     if not s or i < s then -- add string before ${var}, or the last string
       local str = str_sub(glob, i, s and s - 1)
-      if str ~= '' then n = n + 1 ; pt[n] = from_glob(str) end
+      if str ~= '' then
+        str = from_glob(str)
+        if lstr then lstr = lstr..str ; pt[n] = lstr -- append to prev string
+        else n = n + 1 ; pt[n] = str ; lstr = str end -- or add new element
+      end
       if not s then return pt end
     end
     local v = var_f(var_table, name)
@@ -223,32 +228,39 @@ local function glob_parse(glob, var_table, var_f)
     end
     local vt = type(v)
     if vt == 'table' and #v == 1 then v, vt = v[1], nil end
-    if vt ~= 'table' then v = tostring(v or '{empty}') end
-    n = n + 1 ; pt[n] = v ; i = e + 1
+    if vt == 'table' then
+      n = n + 1 ; pt[n] = v ; lstr = nil
+    else
+      v = tostring(v or '{empty}')
+      if lstr then lstr = lstr..v ; pt[n] = lstr -- append to prev string
+      else n = n + 1 ; pt[n] = v ; lstr = v end -- or add new element
+    end
+    i = e + 1
   end
 end
 
 -- Computes all possible expansions of the path pattern 'pt' (the product
--- of its list variables) and calls `callback` with each resulting string.
-local function _product(pt, t, i, n, callback)
+-- of its list variables) and calls callback(arg, str) with each string.
+local function _product(pt, t, i, n, callback, arg)
   while i <= n do
     local v = pt[i]
     local vt = type(v)
     if vt == 'table' then
       for k = 1, #v do
         t[i] = v[k]
-        _product(pt, t, i + 1, n, callback)
+        local res = _product(pt, t, i + 1, n, callback, arg)
+        if res then return res end
       end
       return
     end
     i = i + 1
   end
-  callback(tbl_concat(t))
+  return callback(arg, tbl_concat(t))
 end
-local function glob_product(pt, callback)
-  local n = #pt ; if n == 1 then return callback(pt[1]) end -- optimization
+local function glob_product(pt, callback, arg)
+  local n = #pt ; if n == 1 then return callback(arg, pt[1]) end -- optimization
   local t = {} ; for i = 1, n do t[i] = pt[i] end
-  _product(pt, t, 1, n, callback)
+  return _product(pt, t, 1, n, callback, arg)
 end
 
 -- Returns whether the `path` string matches the `glob` pattern. Supports
@@ -260,9 +272,12 @@ end
 -- All ${vars} are expanded and matched as plain strings (no patterns), except
 -- when the variable is a list. For lists, we iterate all elements (as plain
 -- strings) and test whether any element can be used to match the path.
-local function match(path, glob)
-  if not glob then error('missing glob pattern', 2) end
-  return str_match(path, '^'..from_glob(glob)..'$') ~= nil
+local function match_alternatives(path, patt)
+  return str_match(path, '^'..patt..'$') ~= nil
+end
+local function match(path, glob, var_table, var_f)
+  local pt = glob_parse(glob, var_table, var_f)
+  return glob_product(pt, match_alternatives, path) or false
 end
 
 -- GLOB

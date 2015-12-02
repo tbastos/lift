@@ -131,16 +131,19 @@ describe('lift.path', function()
     it("accepts **, *, ?, [charsets] and n-fold variable expansions", function()
       -- parsing of glob patterns
       assert.same({'[^/]*%.lua'}, path.glob_parse('*.lua', vars))
-      assert.same({'[^/]*/', 'fname', '%.lua'}, path.glob_parse('*/${name}.lua', vars))
-      assert.same({'[^/]*/', 'fname', '%.', vars.exts},
+      assert.same({'[^/]*/fname%.lua'}, path.glob_parse('*/${name}.lua', vars))
+      assert.same({'[^/]*/fname%.', vars.exts},
         path.glob_parse('*/${name}.${exts}', vars))
-      -- product of vars in glob patterns
-      local list = {} ; local function collect(v) list[#list+1] = v end
+      -- set product of vars in glob patterns
+      local list = {} ; local function collect(a, v) list[#list+1] = v end
       path.glob_product(path.glob_parse('*.lua', vars), collect)
       assert.same({'[^/]*%.lua'}, list)
       list = {}
       path.glob_product(path.glob_parse('${name}.lua', vars), collect)
       assert.same({'fname%.lua'}, list)
+      list = {}
+      path.glob_product(path.glob_parse('${exts}', vars), collect)
+      assert.same({vars.exts}, list)
       list = {}
       path.glob_product(path.glob_parse('${name}.${exts}', vars), collect)
       assert.same({'fname%.png', 'fname%.jpg'}, list)
@@ -148,6 +151,12 @@ describe('lift.path', function()
       path.glob_product(path.glob_parse('${path}/${name}.${exts}', vars), collect)
       assert.same({'/var/fname%.png', '/var/fname%.jpg',
         '/usr/local/var/fname%.png', '/usr/local/var/fname%.jpg'}, list)
+    end)
+
+    it("can check whether a string matches a glob pattern", function()
+      assert.True(path.match('/x/y/z/file.jpg', '**/z/*.${exts}', vars))
+      assert.True(path.match('/z/file.jpg', '**/z/*.${exts}', vars))
+      assert.False(path.match('file.jpeg', '*.${exts}', vars))
     end)
 
     -- counts how many files a glob() matched
