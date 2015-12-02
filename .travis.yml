@@ -20,6 +20,7 @@ before_install:
   - git clone https://github.com/libuv/libuv && cd libuv && sh autogen.sh && ./configure && make && cd ..
 
 before_script:
+  - luarocks install lpeg
   - luarocks install lluv UV_DIR=$TRAVIS_BUILD_DIR/libuv UV_LIBDIR=$TRAVIS_BUILD_DIR/libuv/.libs
   - luarocks install busted
   - luarocks install luacov

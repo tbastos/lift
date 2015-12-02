@@ -39,8 +39,8 @@ You may also want to read the [project's philosophy](CONTRIBUTING.md#philosophy)
 
 The following projects have in some way influenced Lift's design:
 
-- Command-line interface: [NPM], [Thor], [argparse]
-- Configuration: [NPM], [CMake], [Vim]
+- Command-line interface: [npm], [argparse]
+- Configuration: [npm], [CMake], [Vim]
 - Diagnostics: [Clang]
 - Path API: [Go]
 - Task/build system: [Rake]/[Jake], [Gulp]
@@ -58,7 +58,6 @@ The following projects have in some way influenced Lift's design:
 [LPeg]: http://www.inf.puc-rio.br/~roberto/lpeg/
 [Lua]: http://www.lua.org/
 [LuaRocks]: http://www.luarocks.org/
-[NPM]: https://www.npmjs.org/doc/
+[npm]: https://www.npmjs.org/doc/
 [Rake]: http://en.wikipedia.org/wiki/Rake_(software)
-[Thor]: https://github.com/erikhuda/thor/wiki
 [Vim]: http://en.wikipedia.org/wiki/Vim_(text_editor)

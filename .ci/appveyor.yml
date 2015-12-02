@@ -40,6 +40,7 @@ install:
   - set PATH=%PATH%;%LIBUV%
 
 build_script:
+  - luarocks install lpeg
   - luarocks install lluv "UV_DIR=%LIBUV%" "UV_LIBDIR=%LIBUV%"
   - luarocks install busted
   - busted -v
