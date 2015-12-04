@@ -127,7 +127,7 @@ describe('lift.path', function()
       path = {'/var', '/usr/local/var'},
       exts = {'png', 'jpg'},
       readme = 'README',
-      list = {'invalid', 'README', 'spec'},
+      list = {'valid/foo', 'README', 'spec'},
     }
 
     it("accepts **, *, ?, [charsets] and n-fold variable expansions", function()
@@ -200,6 +200,10 @@ describe('lift.path', function()
 
       it = path.glob('${list}.md', vars)
       assert.match('/README%.md$', it())
+      assert.is_nil(it())
+
+      it = path.glob('spec/*/in${list}.lua', vars)
+      assert.match('/spec/files/invalid/foo%.lua$', it())
       assert.is_nil(it())
     end)
 
