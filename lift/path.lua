@@ -2,11 +2,12 @@
 -- Directory and file path manipulation routines
 ------------------------------------------------------------------------------
 
-local assert, load, tostring, type = assert, load, tostring, type
-local unpack = table.unpack or unpack -- LuaJIT compatibility
+local assert, tostring, type = assert, tostring, type
+local setmetatable = setmetatable
 local tbl_concat = table.concat
 local str_match, str_gmatch = string.match, string.gmatch
 local str_sub, str_find, str_gsub = string.sub, string.find, string.gsub
+local co_wrap, co_yield = coroutine.wrap, coroutine.yield
 local from_glob = require('lift.string').from_glob
 
 local config -- required at the end, to solve circular dependencies
@@ -40,17 +41,7 @@ local function cwd() return to_slash(uv_cwd()) end
 local function stat(path) return uv_stat(from_slash(path)) end
 local function mkdir(path) return uv_mkdir(from_slash(path), 493) end -- 493 = 0755
 local function rmdir(path) return uv_rmdir(from_slash(path)) end
-
-local Dir = {}
-Dir.__index = Dir
-function Dir:next() local i = self.i or 0; i = i + 1; self.i = i; return self[i] end
-function Dir:close() end
-
-local function scan_dir(path)
-  -- TODO rewrite glob using coroutines and libuv
-  -- this is temporary hack (adapter)
-  return setmetatable(uv_scandir(from_slash(path)), Dir)
-end
+local function scan_dir(path) return uv_scandir(from_slash(path)) end
 
 ------------------------------------------------------------------------------
 -- Routines for manipulating slash-separated paths
@@ -195,16 +186,24 @@ local function mkdir_all(path)
 end
 
 ------------------------------------------------------------------------------
--- Globbing with wildcards, [charsets] and n-fold ${variable} expansions
+-- Globbing: shell-style glob patterns and n-fold ${variable} expansions
 ------------------------------------------------------------------------------
+-- Supports wildcards (**/, *, ?, [charsets]) and n-fold ${var} expansions.
+-- A '**' matches 0 or more directories. It must adjoin '/'s, as in '**/'.
+-- A '*' matches 0 or more characters (but never '/').
+-- A '?' matches any single character (but not '/').
+-- A [charset] matches a character in the set (use [^...] for set complement).
+--   Caveat: charsets cannot contain the character '/'
+-- All ${variables} are expanded and matched as plain strings (no patterns).
+-- Special case: if ${var} is a list, each element is tested to match the path.
 
-local function index_table(t, k) return t[k] end -- default var_f
+-- default get_var
+local function index_table(t, k) return t[k] end 
 
--- Creates a path pattern table from a `glob` string.  Accepts **, *, ?,
--- [charsets] and ${variables}. Beware: a '**' can only be adjacent to '/'s.
--- A 'path pattern' is a list where each elem is either a string or a list.
-local function glob_parse(glob, var_table, var_f)
-  var_table, var_f = var_table or config, var_f or index_table
+-- Creates a path pattern table from a `glob` string.
+-- A pattern table is a list where each elem is either a string or a list.
+local function glob_parse(glob, vars, get_var)
+  vars, get_var = vars or config, get_var or index_table
   local pt, n, i = {}, 0, 1 -- pattern table, #pt, pos in glob
   local lstr -- last added string (or nil if pt[n] is not a string)
   while true do
@@ -212,13 +211,12 @@ local function glob_parse(glob, var_table, var_f)
     if not s or i < s then -- add string before ${var}, or the last string
       local str = str_sub(glob, i, s and s - 1)
       if str ~= '' then
-        str = from_glob(str)
         if lstr then lstr = lstr..str ; pt[n] = lstr -- append to prev string
         else n = n + 1 ; pt[n] = str ; lstr = str end -- or add new element
       end
       if not s then return pt end
     end
-    local v = var_f(var_table, name)
+    local v = get_var(vars, name)
     if not v then error('no such variable ${'..name..'}', 2) end
     -- if the var is a string containing LIST_SEPS, convert it to a list
     if type(v) == 'string' and str_find(v, LIST_SEPS_PATT) then
@@ -239,8 +237,9 @@ local function glob_parse(glob, var_table, var_f)
   end
 end
 
--- Computes all possible expansions of the path pattern 'pt' (the product
+-- Computes all possible expansions of the pattern table 'pt' (the product
 -- of its list variables) and calls callback(arg, str) with each string.
+-- Stops and returns the first truthy result from callback.
 local function _product(pt, t, i, n, callback, arg)
   while i <= n do
     local v = pt[i]
@@ -255,146 +254,98 @@ local function _product(pt, t, i, n, callback, arg)
     end
     i = i + 1
   end
-  return callback(arg, tbl_concat(t))
+  return callback(tbl_concat(t), arg)
 end
 local function glob_product(pt, callback, arg)
-  local n = #pt ; if n == 1 then return callback(arg, pt[1]) end -- optimization
+  local n = #pt
+  if n == 1 and type(pt[1]) == 'string' then -- optimization
+    return callback(pt[1], arg)
+  end
   local t = {} ; for i = 1, n do t[i] = pt[i] end
   return _product(pt, t, 1, n, callback, arg)
 end
 
--- Returns whether the `path` string matches the `glob` pattern. Supports
--- wildcards (**/, *, ?), [charsets], and n-fold ${variable} expansions.
--- A '**' matches zero or more directories and subdirectories.
--- A '*' matches zero or more characters (but never '/').
--- A '?' matches any single character (but not '/').
--- A [set] matches a character in the set (use [^set] for set complement).
--- All ${vars} are expanded and matched as plain strings (no patterns), except
--- when the variable is a list. For lists, we iterate all elements (as plain
--- strings) and test whether any element can be used to match the path.
-local function match_alternatives(path, patt)
-  return str_match(path, '^'..patt..'$') ~= nil
+-- Returns whether the `path` string matches the `glob` pattern.
+local function match_alternative(pattern, path)
+  pattern = (str_gsub(from_glob(pattern), '%[^/]%*%[^/]%*/', '.*/')) -- handle **/
+  return str_match(path, '^'..pattern..'$') ~= nil
 end
-local function match(path, glob, var_table, var_f)
-  local pt = glob_parse(glob, var_table, var_f)
-  return glob_product(pt, match_alternatives, path) or false
+local function match(path, glob, vars, get_var)
+  local pt = glob_parse(glob, vars, get_var)
+  return glob_product(pt, match_alternative, path) or false
 end
 
--- GLOB
-local function next_s(str, state) return state, nil end
-local function next_l(list, i)
-  if i >= #list then return end
-  i = i + 1 ; return list[i], i
-end
-local function next_p(patt, dir_obj)
-  while true do
-    local s = dir_obj:next() if not s then dir_obj:close() return end
-    if s ~= '.' and s ~= '..' and match(s, patt) then return s, dir_obj end
-  end
-end
+-- metatable to memoize scan_dir()
+local DirEntries = {__index = function(t, path)
+  local res = scan_dir(path) or false
+  t[path] = res
+  return res
+end}
 
--- returns an iterator and initial state for a component c
-local function init(c, t, i) -- i = number of valid elements in t
-  -- on well-formed dir paths, test if dir exists
-  local path ; if i > 0 and str_sub(t[i], -1) == '/' then
-    path = tbl_concat(t, '', 1, i)
-    if not is_dir(path) then return path, nil end
-  end
-  if type(c) == 'table' then return next_l, 0 end -- list
-  if str_find(c, '[*?[]') then -- pattern
-    local dir_obj = scan_dir(path) ; return next_p, dir_obj
-  end
-  return next_s, c -- string
-end
-
-local function globber_factory(n)
-  local t = {'local init, stat, abs, concat, t'}
-  for i = 1, n do t[#t + 1] = ', c'..i end
-  for i = 1, n do t[#t + 1] = ', f'..i..', s'..i end
-  t[#t + 1] = ' = ...\nreturn function() local v repeat\n'
-  for i = n, 1, -1 do t[#t + 1] = 'repeat while not s'..i..' do\n' end
-  t[#t + 1] = 'if f1 then return nil end\n'
-  for i = 1, n do
-    t[#t + 1] = 'f'..i..', s'..i..' = init(c'..i..', t, '..(i - 1)..
-      ') end v, s'..i..' = f'..i..'(c'..i..', s'..i..') until v t['..
-      i..'] = '..(i > 1 and 'v' or 'abs(v, nil, true)')..'\n'
-  end
-  t[#t + 1] = 'v = concat(t) until stat(v) return v end'
-  return assert(load(tbl_concat(t), '=globber_factory('..n..')'))
-end
-
-local cache = {}
-function cache:__index(n)
-  local f = globber_factory(n)
-  self[n] = f ; return f
-end
-cache = setmetatable(cache, cache)
-
--- adds a str to the list t; if last elem is a string, appends str to it
-local function add_str(t, n, lstr, str)
-  if lstr then lstr = lstr .. str ; t[n] = lstr ; return n, lstr end
-  n = n + 1 ; t[n] = str ; return n, str
-end
-
--- Returns an iterator over the files matching the glob pattern.
--- Supports patterns such as '/${list}/*/bin/lua*'. The input pattern
--- can be absolute or relative. Returned filenames are always absolute.
-local function glob(pattern, env, enable_debug)
-  local match_var, match_patt_elem = '%${([^}]+)}', '([^/]*[*?[][^/]*)'
-  local t, n, i, lstr = {}, 0, 1 -- template list, #t, position in pattern
-  local sv, ev, name = str_find(pattern, match_var, i)
-  local sp, ep, patt = str_find(pattern, match_patt_elem, i)
-  while true do
-    local s -- s = min(sv, sp) or whichever is available
-    if not sv then if not sp then break else s = sp end
-    else if not sp then s = sv else s = (sv < sp and sv or sp) end end
-    if s == sp then -- pattern (always preceded by a string)
-      n = add_str(t, n, lstr, str_sub(pattern, i, s - 1))
-      if str_find(patt, '${', 1, true) then
-        error("patterns and ${vars} must be separated by '/'", 2)
+-- visits all subdirs of path calling f on them
+local function glob_starstar(f, path, dir_entries, ...)
+  f(path, dir_entries, ...)
+  local names = dir_entries[path]
+  for i = 1, #names do
+    local name = names[i]
+    if str_find(name, '^%.') == nil then -- ignore dot files
+      local p = path..'/'..names[i]
+      if is_dir(p) then
+        glob_starstar(f, p, dir_entries, ...)
       end
-      n = n + 1 ; t[n] = patt ; lstr = nil
-      i = ep + 1 ; sp, ep, patt = str_find(pattern, match_patt_elem, i)
-    else -- variable (optionally preceded by a string)
-      if i < s then
-        local str = str_sub(pattern, i, s - 1)
-        n, lstr = add_str(t, n, lstr, str)
-      end
-      local v = (env or config)[name]
-      if not v then error('no such variable ${'..name..'}', 2) end
-      -- if the var is a string containing LIST_SEPS, turn it into a table
-      if type(v) == 'string' then
-        local ss, e = str_find(v, LIST_SEPS_PATT)
-        if ss then
-          local tt, ii = {str_sub(v, 1, ss - 1)}
-          repeat
-            ii = e + 1 ; ss, e = str_find(v, LIST_SEPS_PATT, ii)
-            tt[#tt + 1] = str_sub(v, ii, ss and ss - 1)
-          until not ss
-          v = tt
-        end
-      end
-      if type(v) ~= 'table' then n, lstr = add_str(t, n, lstr, tostring(v))
-      elseif #v > 1 then n = n + 1 ; t[n] = v ; lstr = nil
-      elseif #v == 1 then n, lstr = add_str(t, n, lstr, tostring(v[1])) end
-      i = ev + 1 ; sv, ev, name = str_find(pattern, match_var, i)
     end
   end
-  if i < #pattern then n = add_str(t, n, lstr, str_sub(pattern, i)) end
-  -- we may hook the following functions for debugging
-  local _init, _stat = init, stat ; if enable_debug then
-    _init = function(...)
-      local a, b = init(...)
-      if not b then print('glob: nil', a) end
-      return a, b
-    end
-    local ic = 0
-    _stat = function(path)
-      if ic >= 99 then error('glob exceeded '..ic..' iterations') end
-      ic = ic + 1 ; local r = stat(path) print('glob:', r, path) return r
+end
+
+-- processes the glob pattern recursively while visiting matches
+local function glob_recurse(path, dir_entries, pattern, init, len)
+  -- find the next path segment containing a pattern
+  local s, e, patt = str_find(pattern, '([^/]*[[*?][^/]*)', init)
+  path = path..str_sub(pattern, init, s and s - 1) -- expand path to just before patt
+  if not s then
+    -- no more patterns, check if this path exists...
+    if stat(path) then co_yield(path) end
+    return
+  end
+  -- scan files in current path
+  local names = dir_entries[path]
+  if not names then return end -- not a dir, give up this path
+  e = e + 1
+  if patt == '**' then -- starstar: match any number of subdirs
+    if e >= len then error("expected a name or pattern after wildcard '**'", 0) end
+    path = str_sub(path, 1, -2) -- remove trailing slash
+    dir_entries[path] = names -- optimization
+    return glob_starstar(glob_recurse, path, dir_entries, pattern, e, len)
+  end
+  -- ignore dot files unless patt begins with a dot (ex: $HOME/.*/file)
+  local ignore_dot = (str_sub(patt, 1, 1) ~= '.')
+  patt = (ignore_dot and '^(%.?)' or '^')..from_glob(patt)..'$'
+  for i = 1, #names do
+    local name = names[i]
+    local matched, _, dot = str_find(name, patt)
+    if matched and dot ~= '.' then
+      if e < len then -- pattern continues
+        glob_recurse(path..name, dir_entries, pattern, e, len)
+      else -- pattern ends here, and this is a match
+        co_yield(path..name)
+      end
     end
   end
-  return cache[n](_init, _stat, abs, tbl_concat, t, unpack(t))
+end
+
+-- called for all combinations of vars, with a complete pattern string
+local function glob_alternative(pattern, dir_entries)
+  local base_dir = is_abs(pattern) and '' or ((config.cd or cwd())..'/')
+  glob_recurse(base_dir, dir_entries, pattern, 1, #pattern)
+end
+
+-- Finds all pathnames that match the glob pattern. Returns an iterator
+-- that produces an absolute path (or nil) each time it's called.
+local function glob(pattern, vars, get_var)
+  local pt = glob_parse(pattern, vars, get_var)
+  return co_wrap(function()
+    glob_product(pt, glob_alternative, setmetatable({}, DirEntries))
+  end)
 end
 
 ------------------------------------------------------------------------------

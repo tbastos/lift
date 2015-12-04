@@ -53,9 +53,8 @@ local function escape_magic(str)
   return (str_gsub(str, '[$^%().[%]*+-?]', '%%%1'))
 end
 
--- Converts a file globbing pattern to a Lua pattern. Supports '**/', '*', '?'
--- and Lua-style [character sets]. Note that '**' must always precede a '/'.
--- Does not support escaping with '\', use charsets instead: '[*?]'.
+-- Converts a basic glob pattern to a Lua pattern. Supports '*', '?'
+-- and Lua-style [character sets]. Use charsets to escape: '[*]'.
 local glob_to_lua = { ['^'] = '%^', ['$'] = '%$', ['%'] = '%%',
   ['('] = '%(', [')'] = '%)', ['.'] = '%.', ['['] = '%[', [']'] = '%]',
   ['+'] = '%+', ['-'] = '%-', ['?'] = '[^/]', ['*'] = '[^/]*' }
@@ -68,8 +67,7 @@ local function from_glob(glob)
     res = res..str_gsub(before, '[$^%().[%]*+-?]', glob_to_lua)..(charset or '')
     i = e and e + 1
   until not i
-  -- handle '**/' as a last gsub pass
-  return (str_gsub(res, '%[^/]%*%[^/]%*/', '.*/'))
+  return res
 end
 
 ------------------------------------------------------------------------------
@@ -89,12 +87,12 @@ local Xpand = P{
   Var = Ca(1) * Ca(2) * VB * (INTEGER*VE + Cs(V'Str')*VE) / map_var
 }
 
-local function index_table(t, k) return t[k] end -- default var_f
+local function index_table(t, k) return t[k] end -- default get_var
 
--- Replaces '${vars}' with the result of var_f(var_table, 'varname').
--- If var_f is omitted, var_table must be a table with string/integer keys.
-local function expand(str, var_table, var_f)
-  return lpeg.match(Xpand, str, nil, var_f or index_table, var_table) or str
+-- Replaces '${foo}' with the result of get_var(vars, 'foo'). The key can be
+-- a string or an integer. When `vars` is a table, `get_var` can be omitted.
+local function expand(str, vars, get_var)
+  return lpeg.match(Xpand, str, nil, get_var or index_table, vars) or str
 end
 
 ------------------------------------------------------------------------------

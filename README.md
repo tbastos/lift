@@ -17,7 +17,7 @@ Lift is both a **task automation tool** and a **framework** for writing command-
 - Modular, extensible architecture with plugins.
 
 ### Prerequisites
-- **OS:** Linux, OSX, Windows or any platform supported by [libuv].
+- **OS:** Linux, OSX, Windows or another platform supported by [libuv].
 - **Lua:** Lua 5.2, Lua 5.3, LuaJIT 2.0 or LuaJIT 2.1
 - **Libraries:** [LPeg] and [lluv]
 
@@ -39,10 +39,10 @@ You may also want to read the [project's philosophy](CONTRIBUTING.md#philosophy)
 
 The following projects have in some way influenced Lift's design:
 
-- Command-line interface: [npm], [argparse]
+- Command-line interface: [Go], [npm], [argparse]
 - Configuration: [npm], [CMake], [Vim]
 - Diagnostics: [Clang]
-- Path API: [Go]
+- Path API: [Go's filepath]
 - Task/build system: [Rake]/[Jake], [Gulp]
 
 [argparse]: https://github.com/mpeterv/argparse
@@ -50,7 +50,8 @@ The following projects have in some way influenced Lift's design:
 [Clang]: http://clang.llvm.org/docs/InternalsManual.html
 [CMake]: http://www.cmake.org/
 [DSL]: http://en.wikipedia.org/wiki/Domain-specific_language
-[Go]: http://golang.org/pkg/path/filepath/
+[Go]: https://golang.org/cmd/go/
+[Go's filepath]: http://golang.org/pkg/path/filepath/
 [Gulp]: http://gulpjs.com/
 [Jake]: http://jakejs.com/
 [libuv]: http://libuv.org/

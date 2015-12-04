@@ -52,8 +52,6 @@ describe('lift.string', function()
   it('offers from_glob() to convert glob patterns to Lua patterns', function()
     assert.equal('/some/file%.ext', str.from_glob('/some/file.ext'))
     assert.equal('/[^/]*/file%.xy[^/]', str.from_glob('/*/file.xy?'))
-    assert.equal('/.*/[^/]*%.lua', str.from_glob('/**/*.lua'))
-    assert.equal('/[^/]*[^/]*%.lua', str.from_glob('/**.lua'))
     assert.equal('/[a-zA-Z]/file_[?]%.cool', str.from_glob('/[a-zA-Z]/file_[?].cool'))
   end)
 

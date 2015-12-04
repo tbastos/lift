@@ -126,88 +126,85 @@ describe('lift.path', function()
       name = 'fname',
       path = {'/var', '/usr/local/var'},
       exts = {'png', 'jpg'},
+      readme = 'README',
+      list = {'invalid', 'README', 'spec'},
     }
 
     it("accepts **, *, ?, [charsets] and n-fold variable expansions", function()
       -- parsing of glob patterns
-      assert.same({'[^/]*%.lua'}, path.glob_parse('*.lua', vars))
-      assert.same({'[^/]*/fname%.lua'}, path.glob_parse('*/${name}.lua', vars))
-      assert.same({'[^/]*/fname%.', vars.exts},
+      assert.same({'*.lua'}, path.glob_parse('*.lua', vars))
+      assert.same({'*/fname.lua'}, path.glob_parse('*/${name}.lua', vars))
+      assert.same({'*/fname.', vars.exts},
         path.glob_parse('*/${name}.${exts}', vars))
       -- set product of vars in glob patterns
-      local list = {} ; local function collect(a, v) list[#list+1] = v end
+      local list = {}
+      local function collect(patt) list[#list+1] = patt end
       path.glob_product(path.glob_parse('*.lua', vars), collect)
-      assert.same({'[^/]*%.lua'}, list)
+      assert.same({'*.lua'}, list)
       list = {}
       path.glob_product(path.glob_parse('${name}.lua', vars), collect)
-      assert.same({'fname%.lua'}, list)
+      assert.same({'fname.lua'}, list)
       list = {}
       path.glob_product(path.glob_parse('${exts}', vars), collect)
-      assert.same({vars.exts}, list)
+      assert.same(vars.exts, list)
       list = {}
       path.glob_product(path.glob_parse('${name}.${exts}', vars), collect)
-      assert.same({'fname%.png', 'fname%.jpg'}, list)
+      assert.same({'fname.png', 'fname.jpg'}, list)
       list = {}
       path.glob_product(path.glob_parse('${path}/${name}.${exts}', vars), collect)
-      assert.same({'/var/fname%.png', '/var/fname%.jpg',
-        '/usr/local/var/fname%.png', '/usr/local/var/fname%.jpg'}, list)
+      assert.same({'/var/fname.png', '/var/fname.jpg',
+        '/usr/local/var/fname.png', '/usr/local/var/fname.jpg'}, list)
     end)
 
-    it("can check whether a string matches a glob pattern", function()
+    it("can match a string against a glob pattern", function()
       assert.True(path.match('/x/y/z/file.jpg', '**/z/*.${exts}', vars))
       assert.True(path.match('/z/file.jpg', '**/z/*.${exts}', vars))
       assert.False(path.match('file.jpeg', '*.${exts}', vars))
     end)
 
-    -- counts how many files a glob() matched
-    local function count_glob(...)
-      local it, n = path.glob(...), 0
-      while it() do n = n + 1 end return n
-    end
-
-    it('supports simple file name patterns', function()
+    it("can find files using wildcards", function()
       local it = path.glob('*.md') ; assert.is_function(it)
       local filename = it() ; assert.is_string(filename)
-      assert.True(filename:find('/CONTRIBUTING%.md$') ~= nil)
-      filename = it() ; assert.is_string(filename)
-      assert.True(filename:find('/README%.md$') ~= nil)
+      assert.match('/CONTRIBUTING%.md$', filename)
+      assert.match('/README%.md$', it())
       assert.is_nil(it())
-      assert.is_nil(it())
+      assert.error(function() it() end, "cannot resume dead coroutine")
+      assert.is_nil(path.glob('/invalid/*.md')())
+      assert.match('/README.md$', path.glob('./REA*.??')())
+      assert.match('/spec/files/user/init.lua$', path.glob('spec/*/user/ini*')())
+      assert.match('/spec/files/init.lua$', path.glob('spec/*/init.lua')())
+      assert.match('/spec/files/invalid/foo/z$', path.glob('**/z')())
+      assert.error(function() path.glob('**')() end,
+        "expected a name or pattern after wildcard '**'")
+    end)
 
-      it = path.glob('READ??.[a-z][a-z]')
-      assert.equal(filename, it())
-      assert.is_nil(it())
-
-      it = path.glob('/invalid/*.md')
-      assert.is_nil(it())
-
-      assert.error_matches(function() path.glob('${var}?') end, 'must be separated')
-
-      local mods, specs = count_glob('li*/*.lua'), count_glob('sp?c/*_spec.lua')
-      assert.True(mods > 5, mods < 15, specs > 5, specs < 15)
+    it("wildcards **/ and /*/ ignore dot files by default", function()
+      if path.is_dir('.git') then
+        assert.is_nil(path.glob('**/HEAD')())
+        assert.is_nil(path.glob('*/HEAD')())
+        assert.is_nil(path.glob('./*/HEAD')())
+        assert.is_string(path.glob('.*/HEAD')())
+        assert.is_string(path.glob('./.*git/HEAD')())
+      else
+        pending("skipped some tests because lift/.git doesn't exist")
+      end
     end)
 
     it('supports configurable ${var} and ${list} expansions', function()
-      local env = {name = 'README', list = {'invalid', 'README', 'spec'}}
-      local it = path.glob('./${name}.md', env)
-      local filename = it() ; assert.is_string(filename)
-      assert.True(filename:find('/README%.md$') ~= nil)
+      local it = path.glob('./${readme}.md', vars)
+      assert.match('/README%.md$', it())
       assert.is_nil(it())
 
-      assert.error(function() path.glob('${invalid}', env) end,
+      assert.error(function() path.glob('${invalid}', vars) end,
         'no such variable ${invalid}')
 
-      it = path.glob('${list}.md', env)
-      assert.equal(filename, it())
+      it = path.glob('${list}.md', vars)
+      assert.match('/README%.md$', it())
       assert.is_nil(it())
-
-      env.mods = {'nada', 'cli', 'string', 'template', 'invalid'}
-      assert.equal(3, count_glob('./${list}/${mods}_spec.lua', env))
-      assert.True(5 < count_glob('./${list}/*_spec*', env))
     end)
 
-    it('supports default ${config} expansions', function()
-      assert.True(count_glob('${PATH}/lua*') > 0)
+    it('expands config variables by default', function()
+      assert.is_string(path.glob('${PATH}/lua*')())
     end)
 
   end)
