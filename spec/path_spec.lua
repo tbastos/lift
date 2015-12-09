@@ -130,7 +130,7 @@ describe('lift.path', function()
       list = {'valid/foo', 'README', 'spec'},
     }
 
-    it("accepts **, *, ?, [charsets] and n-fold variable expansions", function()
+    it("accepts **, *, ?, [cclass] and n-fold variable expansions", function()
       -- parsing of glob patterns
       assert.same({'*.lua'}, path.glob_parse('*.lua', vars))
       assert.same({'*/fname.lua'}, path.glob_parse('*/${name}.lua', vars))

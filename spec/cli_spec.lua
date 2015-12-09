@@ -46,15 +46,15 @@ describe('lift.cli', function()
     assert.True(called)
     assert.same(verifier[#verifier],
       diagnostics.new("warning: unused argument '${1}'", 'wasted'))
-    assert.error_matches(function() root:process{'one', 'two'} end,
+    assert.error_match(function() root:process{'one', 'two'} end,
       'missing argument <three>')
   end)
 
   it('allows actions to return error messages', function()
     root:action(function() return 'booom' end)
     root:flag('f'):action(function() return 'oops' end)
-    assert.error_matches(function() root:process{} end, 'booom')
-    assert.error_matches(function() root:process{'-f'} end, 'oops')
+    assert.error_match(function() root:process{} end, 'booom')
+    assert.error_match(function() root:process{'-f'} end, 'oops')
   end)
 
   describe('when parsing args', function()
@@ -95,13 +95,13 @@ describe('lift.cli', function()
       root:process{'--x=off', '--Y'}
       assert.equal(false, root:get'x') assert.equal(true, root:get'y')
 
-      assert.error_matches(function() root:process{'--X'} end,
+      assert.error_match(function() root:process{'--X'} end,
         'unknown option %-%-X')
 
-      assert.error_matches(function() root:process{'--unknown'} end,
+      assert.error_match(function() root:process{'--unknown'} end,
         'unknown option %-%-unknown')
 
-      assert.error_matches(function() root:process{'-x=what'} end,
+      assert.error_match(function() root:process{'-x=what'} end,
         "option %-x: expected <bool>, got 'what'")
     end)
 
@@ -131,7 +131,7 @@ describe('lift.cli', function()
       assert.equal('key=value', root:get'name')
       assert.equal('X:P:K', root:get'g')
 
-      assert.error_matches(function() root:process{'--g'} end,
+      assert.error_match(function() root:process{'--g'} end,
         'option %-%-g: missing argument')
     end)
 
@@ -172,13 +172,13 @@ describe('lift.cli', function()
     assert.equal('sub1', root:get_command('sub1').name)
     assert.equal('sub1 sub3', root:get_command('sub1 sub3').name)
     assert.equal('sub1 sub3 sub4', root:get_command('sub1 sub3 sub4').name)
-    assert.error_matches(function() root:get_command('sub1 nope') end,
+    assert.error_match(function() root:get_command('sub1 nope') end,
       "no such command 'sub1 nope'")
 
     root:process{'x', 'sub1', '-o=1'}
     assert.equal('', called) ; assert.equal(2, #with)
 
-    assert.error_matches(function() root:process{'sub1', '-o=1', '-o2=2'} end,
+    assert.error_match(function() root:process{'sub1', '-o=1', '-o2=2'} end,
       "unknown option %-o2 for command 'sub1'")
 
     sub1:alias 's1'
@@ -187,7 +187,7 @@ describe('lift.cli', function()
     assert.equal('sub1', called)
     assert.equal(2, #with)
 
-    assert.error_matches(function() root:process{'sub2', '-o1=1'} end,
+    assert.error_match(function() root:process{'sub2', '-o1=1'} end,
       "unknown option %-o1 for command 'sub2'")
 
     root:process{'sub2', 'y', '-o', 'x'}
@@ -209,7 +209,7 @@ describe('lift.cli', function()
     root:command('del'):delegate_to(root:get_command'sub1 sub3 sub4')
     root:process{'del'}
     assert.equal('sub1 sub3 sub4', called)
-    assert.error_matches(function() root:delegate_to('sub1') end,
+    assert.error_match(function() root:delegate_to('sub1') end,
       "expected a command object, got string")
   end)
 
@@ -224,15 +224,12 @@ describe('lift.cli', function()
 
   describe("default root command", function()
     local exit = os.exit
-    -- luacheck: push
-    -- luacheck: ignore os
     before_each(function()
-      os.exit = function() error('os.exit') end
+      os.exit = function() error('os.exit') end -- luacheck: ignore
     end)
     after_each(function()
-      os.exit = exit
+      os.exit = exit -- luacheck: ignore
     end)
-    -- luacheck: pop
 
     it("implements --help", function()
       local _, out = diagnostics.capture(function()

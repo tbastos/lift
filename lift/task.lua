@@ -2,119 +2,144 @@
 -- Task Engine
 ------------------------------------------------------------------------------
 
-local diagnostics = require 'lift.diagnostics'
-local lstr_format = require('lift.string').format
-
 local tostring, type = tostring, type
 local getmetatable, setmetatable = getmetatable, setmetatable
 local unpack = table.unpack or unpack -- LuaJIT compatibility
 local str_find, str_gmatch, str_match = string.find, string.gmatch, string.match
 local tbl_concat, tbl_sort = table.concat, table.sort
+local dbg_getlocal = debug.getlocal
+
+local lstr_format = require('lift.string').format
+local diagnostics = require 'lift.diagnostics'
+
+local async = require 'lift.async'
+local await, wait_all = async.wait, async.wait_all
 
 ------------------------------------------------------------------------------
--- TaskSet object (callable set of tasks)
+-- Helper Functions
 ------------------------------------------------------------------------------
 
-local TaskSet = {}
-
-function TaskSet.__call(cs, ...)
-  for i = 1, #cs do
-    cs[i](...)
+local function get_or_start(task, arg, extra)
+  local futures = task.futures
+  local future = futures[arg or 1]
+  if future then return future end -- currently running
+  -- check if the task was called correctly
+  local ns = task.ns
+  if arg == ns then
+    error('tasks must be called as .functions() not :methods()', 3)
   end
+  if extra ~= nil then error('tasks can only take one argument', 3) end
+  -- start the task
+  future = async(task.f, arg)
+  future.task = task
+  futures[arg or 1] = future
+  return future
 end
 
-function TaskSet.__tostring(cs)
+------------------------------------------------------------------------------
+-- TaskList object (callable list of tasks)
+------------------------------------------------------------------------------
+
+local TaskList = {}
+
+TaskList.__call = diagnostics.trace(
+  '[task] running ${self} ${arg}',
+  '[task] finished ${self} ${arg}',
+  function(self, arg, extra)
+    local t = {}
+    for i = 1, #self do
+      t[i] = get_or_start(self[i], arg, extra)
+    end
+    local ok, err = wait_all(t)
+    if not ok then
+      if #err.nested == 1 then err = err.nested[1] end
+      err:report()
+    end
+  end)
+
+function TaskList:__tostring()
   local t = {}
-  for i = 1, #cs do
-    t[i] = tostring(cs[i])
+  for i = 1, #self do
+    t[i] = tostring(self[i])
   end
   tbl_sort(t)
-  return 'lift.task{'..tbl_concat(t, ', ')..'}'
+  return 'task list {'..tbl_concat(t, ', ')..'}'
 end
 
 ------------------------------------------------------------------------------
--- Task object (memoized function)
+-- Task (memoized async function with a single argument and multiple results)
 ------------------------------------------------------------------------------
 
 local Task = {
-  name = '?',
+  name = '?', -- unique, fully qualified name
 }
 
 Task.__index = Task
 
-function Task.__call(task, arg, extra)
-  local res = task.res[arg or 1]
-  if not res then
-    -- check if the task was called correctly
-    local group = task.group
-    if arg == group then
-      error('tasks must be called as .functions() not :methods()', 2)
+Task.__call = diagnostics.trace(
+  '[task] running ${self} ${arg}',
+  '[task] finished ${self} ${arg}',
+  function(self, arg, extra)
+    local future = get_or_start(self, arg, extra)
+    local ok, res = await(future)
+    if not ok then
+      res:report()
     end
-    if extra ~= nil then error('tasks can only take one argument', 2) end
-    -- call the function and save the results
-    res = {task.f(group, arg)}
-    task.res[arg or 1] = res
-  end
-  return unpack(res)
-end
+    return unpack(res)
+  end)
 
 function Task.__tostring(task)
-  local prefix = tostring(task.group)
-  return prefix..(prefix == '' and '' or ':')..task.name
+  local prefix = tostring(task.ns)
+  return prefix..(prefix == '' and '' or '.')..task.name
 end
 
-function Task:get_result_for(arg)
-  return self.res[arg or 1]
+function Task:get_results(arg)
+  local future = self.futures[arg or 1]
+  return future and future.results
 end
 
 local function validate_name(name)
   if type(name) ~= 'string' or str_find(name, '^%a[_%w]*$') == nil then
-    error('expected a task name, got '..lstr_format(name), 3)
+    error('expected a task name, got '..lstr_format(name), 4)
   end
 end
 
-local dbg_getlocal = require('debug').getlocal
-local function validate_f(f)
+local function new_task(ns, name, f)
+  validate_name(name)
   if type(f) ~= 'function' then
-    error('expected a function, got '..lstr_format(f), 2)
+    error('expected a function, got '..lstr_format(f), 3)
   end
-  local name = dbg_getlocal(f, 1)
-  if name ~= 'self' then
-    error('tasks must be declared as :methods() not .functions()')
+  local param = dbg_getlocal(f, 1)
+  if param == 'self' then
+    error('tasks must be declared as .functions() not :methods()', 3)
   end
-end
-
-local function new_task(group, name, f)
-  validate_name(name) ; validate_f(f)
-  return setmetatable({group = group, name = name, f = f, res = {false}}, Task)
+  return setmetatable({ns = ns, name = name, f = f, futures = {false}}, Task)
 end
 
 ------------------------------------------------------------------------------
--- Group object (has name, methods, tasks and dependencies)
+-- Namespace (has an unique name; contains tasks and methods)
 ------------------------------------------------------------------------------
 
-local Group = {
-  name = '?',       -- unique name within its parent
-  tasks = nil,      -- tasks map {name = task}
-  parent = nil,     -- group hierarchy
-  children = nil,   -- subgroups map {name = child_group}
-  requires = nil,   -- list of groups required by this group
+local Namespace = {
+  name = '?',    -- unique name within its parent
+  tasks = nil,   -- tasks map {name = task}
+  parent = nil,  -- namespace hierarchy
+  nested = nil,  -- nested namespaces map {name = child_namespace}
 }
 
-local function new_group(name, parent)
-  return setmetatable({name = name, parent = parent,
-    tasks = {}, children = {}, requires = {}}, Group)
+local function new_namespace(name, parent)
+  return setmetatable({name = name, parent = parent, tasks = {}, nested = {}}, Namespace)
 end
 
-function Group.__index(t, k)
-  return t.tasks[k] or Group[k] or t.children[k]
+function Namespace.__index(t, k)
+  return t.tasks[k] or Namespace[k] or t.nested[k]
 end
 
-function Group.__newindex(t, k, v)
+function Namespace.__newindex(t, k, v)
   t.tasks[k] = new_task(t, k, v)
 end
 
-function Group.__call(group, t)
+function Namespace.__call(namespace, t)
   local tp = type(t)
   if tp ~= 'table' then error('expected a table, got '..tp, 2) end
   for i = 1, #t do
@@ -122,49 +147,48 @@ function Group.__call(group, t)
       error('element #'..i..' is not a Task, but a '..type(t[i]))
     end
   end
-  return setmetatable(t, TaskSet)
+  return setmetatable(t, TaskList)
 end
 
-function Group.__tostring(group)
-  local parent = group.parent
-  if not parent then return group.name end
-  if not parent.parent then return group.name end
-  return tostring(parent)..'.'..group.name
+function Namespace.__tostring(ns)
+  local parent = ns.parent
+  if not parent then return ns.name end
+  if not parent.parent then return ns.name end
+  return tostring(parent)..'.'..ns.name
 end
 
-function Group:group(name)
+function Namespace:namespace(name)
   validate_name(name)
-  local child = new_group(name, self)
-  self.children[name] = child
+  local child = new_namespace(name, self)
+  self.nested[name] = child
   return child
 end
 
-function Group:get_group(name)
+function Namespace:get_namespace(name)
   local g = self
-  for s in str_gmatch(name, '([^.:]+)[.:]*') do
-    local child = g.children[s]
+  for s in str_gmatch(name, '([^.]+)%.?') do
+    local child = g.nested[s]
     if not child then
-      diagnostics.report("fatal: no such group '"..tostring(g)..'.'..s.."'")
+      diagnostics.report("fatal: no such namespace '${1}.${2}'", g, s)
     end
     g = child
   end
   return g
 end
 
-function Group:get_task(name)
-  local gn, tn = str_match(name, '^(.-)[.:]*([^.:]+)$')
-  local task = self:get_group(gn).tasks[tn]
+function Namespace:get_task(name)
+  local gn, tn = str_match(name, '^(.-)%.?([^.]+)$')
+  local task = self:get_namespace(gn).tasks[tn]
   if not task then
-    diagnostics.report("fatal: no such task '"..name.."'")
+    diagnostics.report("fatal: no such task '${1}'", name)
   end
   return task
 end
 
-function Group:reset(args)
+function Namespace:reset(args)
   self.tasks = {}
-  self.children = {}
-  self.requires = {}
+  self.nested = {}
 end
 
--- return root task group
-return new_group('')
+-- return root task namespace
+return new_namespace('')

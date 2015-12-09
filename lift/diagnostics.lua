@@ -1,16 +1,22 @@
 ------------------------------------------------------------------------------
--- Diagnostics and Error Handling
+-- Diagnostics reporting, error handling and debug tracing
 ------------------------------------------------------------------------------
--- This is a unified module for error reporting and debug tracing. It
--- doesn't include a fully fledged logging system, but allows you to
--- integrate one through a diagnostics consumer. The focus here is
--- on an error handling system well suited to tools and compilers.
+-- This is a unified module for error handling, diagnostics reporting and debug
+-- tracing. It does NOT provide a general-purpose logging system, but allows
+-- you to integrate with one via diagnostics consumers. The central abstraction
+-- is the diagnostic object, which can be used as an error object in Lua.
+-- Lower-level functions may return nil plus a diagnostic object to signal an
+-- error, while higher-level functions decorate the object with contextual
+-- information and raise them as errors. Diagnostics that are not raised as
+-- errors can be reported as warnings, remarks, or custom kinds of diagnostics.
 
-local rawget, type = rawget, type
+local assert, rawget, type, xpcall = assert, rawget, type, xpcall
+local getmetatable, setmetatable = getmetatable, setmetatable
 local unpack = table.unpack or unpack -- LuaJIT compatibility
 local clock = os.clock
-local str_find, str_sub = string.find, string.sub
-local dbg_getinfo, dbg_getupvalue = debug.getinfo, debug.getupvalue
+local str_find, str_gmatch, str_match = string.find, string.gmatch, string.match
+local str_rep, str_sub = string.rep, string.sub
+local dbg_getinfo, dbg_getlocal = debug.getinfo, debug.getlocal
 local dbg_traceback = debug.traceback
 
 local ls = require 'lift.string'
@@ -49,16 +55,16 @@ local styles = {
 }
 
 ------------------------------------------------------------------------------
--- Diagnostic (a specially-formatted message, plus arguments and decorators)
+-- Diagnostic (message with sequential arguments and properties/decorators)
 ------------------------------------------------------------------------------
 
--- decorators in the hash part, arguments in the array part
+-- objects keep decorators in the hash part, arguments in the array part
 local Diagnostic = {
   kind = 'error',
   level = 'error',
 }
 
--- compute diag.message lazily
+-- compute diagnostic.message lazily
 function Diagnostic:__index(k)
   if k == 'message' then
     local msg = ls_expand(rawget(self, 0) or 'no message', self)
@@ -68,10 +74,12 @@ function Diagnostic:__index(k)
   return Diagnostic[k]
 end
 
--- returns whether a value is a diagnostic
-local function is_a(t) return getmetatable(t) == Diagnostic end
+-- Returns whether a value is a diagnostic.
+local function is_a(value)
+  return getmetatable(value) == Diagnostic
+end
 
--- creates a diagnostic from a message in the format "kind: message"
+-- Creates a diagnostic from a message in the format "kind: my message".
 local function new(t, ...)
   local m -- message
   if type(t) == 'table' then
@@ -92,16 +100,15 @@ end
 -- tostring(diagnostic) == diagnostic:format()
 function Diagnostic:__tostring() return self:format() end
 
--- formats the diagnostic to a string
-function Diagnostic:format()
-  local style = styles[self.kind] or styles[self.level]
-  local loc, str, prefix = self.location, '', style.prefix
-  if loc then str = loc.file..':'..loc.line..': '
-  else prefix = ls_capitalize(prefix) end
-  return str..prefix..' '..self.message
+-- Returns a concise string representation of the diagnostic.
+local function format_diagnostic(d)
+  local loc, str = d.location, ''
+  if loc then str = loc.file..':'..loc.line..': ' end
+  return str..d.kind..': '..d.message
 end
+Diagnostic.format = format_diagnostic
 
--- we report to a diagnostic consumer and keep track of the last error
+-- report to a diagnostic consumer and keep track of the last error
 local consumer, last_error
 local function set_consumer(c)
   local previous = consumer
@@ -110,19 +117,19 @@ local function set_consumer(c)
 end
 
 function Diagnostic:report()
-  assert(consumer, 'undefined diagnostics consumer')
   local level = self.level
   if level == 'ignored' then return
   elseif level == 'error' then last_error = self
   elseif level == 'fatal' then error(self) end
+  assert(consumer, 'undefined diagnostics consumer')
   consumer(self) -- notify consumer (if non-fatal)
 end
 
--- shortcut to new(...):report() for diagnostics without decorators
+-- Short for new(...):report()
 local function report(...) new(...):report() end
 
--- raises the most recent error-level diagnostic, if we got one
-local function fail_if_error()
+-- Raises the most recent error-level diagnostic
+local function check_error()
   if last_error then error(last_error) end
 end
 
@@ -148,24 +155,50 @@ function Diagnostic:source_location(file, contents, pos)
 end
 
 -- sets location based on debug.getinfo (stack level or function)
-function Diagnostic:function_location(level)
-  local info = dbg_getinfo(level, 'Sl')
-  self.location = {file = info.short_src, line = info.currentline}
+function Diagnostic:set_location(level_or_f)
+  local info, line
+  if type(level_or_f) == 'number' then
+    info = dbg_getinfo(level_or_f + 1, 'Sl')
+    line = info.currentline
+  else -- function
+    info = dbg_getinfo(level_or_f, 'S')
+    line = info.linedefined
+  end
+  self.location = {file = info.short_src, line = line}
   return self
 end
 
 ------------------------------------------------------------------------------
--- Decorator: 'lua_stb' (prints a Lua stack traceback)
+-- Decorator: 'stb' (a Lua stack traceback)
 ------------------------------------------------------------------------------
 
--- default level is 1 (the function calling lua_traceback)
-function Diagnostic:lua_traceback(level)
-  self.lua_stb = dbg_traceback(nil, (level or 1) + 1)
+-- default level is 1 (the function calling traceback)
+function Diagnostic:traceback(level)
+  self.stb = dbg_traceback(nil, level + 1)
   return self
 end
 
 ------------------------------------------------------------------------------
--- Verifier (a consumer that accumulates diagnostics for testing)
+-- Nested Diagnostics (aggregates multiple diagnostic objects into one)
+------------------------------------------------------------------------------
+
+local function format_nested(d)
+  local s, nested = format_diagnostic(d), d.nested
+  for i = 1, #nested do
+    s = s..'\n  ('..i..') '..format_diagnostic(nested[i])
+  end
+  return s
+end
+
+-- Creates a diagnostic based on a message and a list of nested diagnostics.
+local function aggregate(message, elements)
+  local n = #elements
+  return new{message, nested = elements, n = n, s = (n > 1 and 's' or ''),
+    format = format_nested}
+end
+
+------------------------------------------------------------------------------
+-- Verifier (consumer that accumulates diagnostics for testing)
 ------------------------------------------------------------------------------
 
 local Verifier = {}
@@ -202,7 +235,7 @@ function Verifier:verify(str_list)
 end
 
 ------------------------------------------------------------------------------
--- Reporter (a consumer that prints diagnostics to stderr)
+-- Reporter (consumer that prints diagnostics to stderr)
 ------------------------------------------------------------------------------
 
 local Reporter = {}
@@ -218,97 +251,160 @@ function Reporter.set_new()
   return reporter
 end
 
-function Reporter:__call(diagnostic)
-  self:report(diagnostic)
-end
-
-function Reporter:report(d)
+local function print_report(d, id, level)
+  local indent = str_rep('  ', level + 1)
   local style = styles[d.kind] or styles[d.level]
-  local loc, prefix = d.location, style.prefix
-  if loc then -- source file location
-    stderr:write(ESC'bold;white', loc.file, ':', loc.line, ':')
-    if loc.column then stderr:write(loc.column, ': ') end
+  local prefix = style.prefix
+  local future = d.future
+  local task = future and future.task
+  local location = d.location
+  -- Identifier (for nested diagnostics)
+  if id ~= '' then
+    stderr:write(str_rep(' ', level * 2 - 1), id, ') ')
+  end
+  -- Thread of origin (if not a task)
+  if future and not task then
+    stderr:write('In ', ESC'green', tostring(future), ESC'clear', ':\n', indent)
+  end
+  -- Location
+  if location then
+    local col = location.column
+    stderr:write(ESC'bold', location.file, ':',
+      location.line, col and ':'..col or '', ': ', ESC'clear')
   else
     prefix = ls_capitalize(prefix)
   end
-  stderr:write(color.from_style(style), prefix, ESC'clear',
-    style.sep or ' ', d.message, ESC'clear', '\n')
-  if d.lua_stb then -- Lua stack traceback
-    stderr:write(d.lua_stb, '\n')
+  -- Task
+  if task then
+    stderr:write('in task ', ESC'green', tostring(task), ESC'clear', '\n', indent)
+    prefix = ls_capitalize(prefix)
   end
-  if d.activity_trace then -- activity trace created by trace()
-    stderr:write('\n', ESC'yellow', 'Trace:', ESC'clear', '\n')
-    for i, msg in ipairs(d.activity_trace) do
-      stderr:write((' '):rep(i * 2), msg, '\n')
+  -- Kind (prefix) and Message
+  stderr:write(color.from_style(style), prefix, ' ', ESC'clear', d.message, '\n')
+  -- Stack traceback
+  local stb = d.stb
+  if stb then
+    stderr:write(indent, ESC'yellow', 'Stack traceback:', ESC'clear', '\n')
+    for line in str_gmatch(stb, '\t([^\t]+)') do
+      stderr:write(indent, '  ', line)
     end
     stderr:write('\n')
   end
-end
-
-------------------------------------------------------------------------------
--- Call tracing and custom pcall() with better error reporting
-------------------------------------------------------------------------------
-
--- tracing is disabled by default
-local tracing, stack = false, {}
-local function set_tracing(v) tracing = v end
-
--- expand_up(msg, f) expands vars using the upvalues of a function
-local function get_upvalue(f, name)
-  for i = 1, 9 do -- limited to the first 9 upvalues
-    local n, v = dbg_getupvalue(f, i)
-    if not n then break
-    elseif n == name then return ls_format(v) end
-  end
-end
-local function expand_up(message, f)
-  return ls_expand(message, f, get_upvalue)
-end
-
--- Traces a call to f(). If tracing is enabled, msg is expanded with f's
--- upvalues and printed to stderr. Also, if diagnostics.pcall() catches
--- an error, it prints msg in the activity trace.
-local function trace(msg, f, ...)
-  local n, t0 = #stack
-  stack[n + 1] = msg
-  stack[n + 2] = f
-  if tracing then
-    if n == 0 then t0 = clock() end -- measure the time of 1st-level calls
-    stderr:write(ESC'clear;blue', (' '):rep(n), expand_up(msg, f), ESC'clear', '\n')
-  end
-  f(...)
-  assert(#stack == n + 2, 'unbalanced activity stack')
-  stack[n + 2] = nil
-  stack[n + 1] = nil
-  if t0 then -- we're timing this call
-    local tmsg = ('%.2f'):format(clock() - t0)
-    stderr:write(ESC'cyan', (' '):rep(n + 2), 'Elapsed time ', tmsg, 's',
-      ESC'clear', '\n')
-  end
-end
-
--- custom diagnostic for Lua errors
-levels.lua_error = 'fatal'
-styles.lua_error = {prefix = 'Lua error!', sep = '\n', fg = 'red'}
-
--- custom error handler for xpcall
-local function error_handler(diag)
-  -- if this is a regular Lua error, convert it to a diagnostic
-  if not is_a(diag) then
-    diag = new("lua_error: ${1}", diag):lua_traceback(3)
-  end
-  -- add the activity stack built by trace()
-  if #stack > 0 then
-    local t = {}
-    for i = 1, #stack, 2 do
-      t[#t + 1] = expand_up(stack[i], stack[i + 1])
+  -- Nested diagnostics
+  local nested = d.nested
+  if nested then
+    if id ~= '' then id = id..'.' end
+    for i, nd in ipairs(nested) do
+      stderr:write('\n')
+      print_report(nd, id..i, level + 1)
     end
-    diag.activity_trace = t
-    stack = {}
   end
-  return diag
 end
 
+function Reporter:__call(diagnostic)
+  print_report(diagnostic, '', 0)
+end
+
+------------------------------------------------------------------------------
+-- Tracing (near zero overhead; concise pre- and post-call messages; timing)
+------------------------------------------------------------------------------
+
+-- master switch
+local tracing = false -- disabled by default
+local tracing_switch = {} -- list of closures that can switch tracing on/off
+local function set_tracing(v)
+  for i = 1, #tracing_switch do
+    tracing_switch[i](v)
+  end
+  tracing = v
+end
+
+-- helpers to expand trace messages
+local nil_arg = setmetatable({}, {__tostring = function() return '<nil>' end})
+local function expand_arg(t, name)
+  local v = t[name]
+  return v and ls_format(v, 60)
+end
+local function expand_trace(msg, args)
+  return ls_expand(msg, args, expand_arg)
+end
+
+-- Returns a function that calls f and optionally prints an execution trace.
+-- When tracing is off, calling f costs only an indirection (function call).
+-- When tracing is on, the messages 'pre' and 'post' are expanded with f's
+-- arguments and printed before and after the call, respectively, to stderr.
+-- The duration of the call is appended to the post message. The post message
+-- can be omitted, in which case timing is disabled. Tracing is not protected,
+-- so if f raises an error, the post message is not printed.
+local function trace(pre, post, f)
+  -- sanitize arguments
+  assert(type(pre) == 'string', 'argument #1 to trace() must be a message string')
+  if type(post) == 'function' then post, f = nil, post end -- no post message
+  assert(post == nil or type(post) == 'string',
+    'argument #2 to trace() must be a message string or a function')
+  assert(type(f) == 'function', "last argument to trace() must be a function")
+  -- tracing wrapper function
+  local function trace_f(...)
+    local args = {...} -- f's arguments indexable by name or sequentially
+    for i = 1, 9 do -- assumes a limit of 9 parameters
+      local name = dbg_getlocal(f, i)
+      if not name then break end
+      args[name] = args[i] or nil_arg
+    end
+    stderr:write(ESC'blue', expand_trace(pre, args), ESC'clear', '\n')
+    if not post then return f(...) end -- optimization
+    -- time the call and print post message
+    local t0 = clock()
+    local res = {f(...)}
+    local time = (' [%.2fs]'):format(clock() - t0)
+    post = expand_trace(post, args)
+    stderr:write(ESC'blue', post, ESC'cyan', time, ESC'clear', '\n')
+    return unpack(res)
+  end
+  local call_f -- points to either f or trace_f
+  local function switch_tracing(v)
+    call_f = v and trace_f or f
+  end
+  tracing_switch[#tracing_switch+1] = switch_tracing
+  switch_tracing(tracing)
+  return function(...) return call_f(...) end
+end
+
+------------------------------------------------------------------------------
+-- Custom pcall() that turns all errors into diagnostic objects
+------------------------------------------------------------------------------
+
+-- custom diagnostic for Lua runtime errors
+levels.lua_error = 'fatal'
+styles.lua_error = {prefix = 'Lua error:', fg = 'red'}
+
+-- error handler for pcall (turns any error into a diagnostic object)
+local function to_diagnostic(err, level)
+  if is_a(err) then return err end
+  local d = new("lua_error: ${1}", err):set_location(level):traceback(level)
+  if type(err) == 'string' then -- try to remove file:line: from the string
+    local file, line, e = str_match(err, '^([^:]+):([^:]+): ()')
+    local loc = d.location
+    if file == loc.file and tonumber(line) == loc.line then
+      d[1] = str_sub(err, e) -- remove redundant information
+    end
+  end
+  return d
+end
+local function error_handler(err) return to_diagnostic(err, 3) end
+-- workaround busted messing with diagnostic objects in tests...
+if package.loaded.busted then
+  error_handler = function(err)
+    if type(err) == 'table' then
+      -- retrieve the diagnostic object from within busted's error object...
+      if not is_a(err) and err.message then err = err.message end
+    end
+    return to_diagnostic(err, 3)
+  end
+end
+
+-- A pcall that turns all errors into diagnostic objects.
+-- Regular errors are always decorated with a stack traceback.
 local function pcall(f, ...)
   return xpcall(f, error_handler, ...)
 end
@@ -391,8 +487,9 @@ end
 ------------------------------------------------------------------------------
 
 return {
+  aggregate = aggregate,
   capture = capture,
-  fail_if_error = fail_if_error,
+  check_error = check_error,
   is_a = is_a,
   levels = levels,
   new = new,

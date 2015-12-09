@@ -44,7 +44,7 @@ end
 local function config_edit(command)
   local sys = command.options.system.value
   local dir = sys and config.system_config_dir or config.user_config_dir
-  local filename = path.from_slash(dir..'/'..config.config_file_name)
+  local filename = path.from_slash(dir..'/init.lua')
   local cmd = ('%s %q'):format(config.editor, filename)
   diagnostics.report('remark: running ${1}', cmd)
   os.execute(cmd)

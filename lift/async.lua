@@ -2,12 +2,12 @@
 -- Asynchronous programming based on coroutines and futures
 ------------------------------------------------------------------------------
 
-local assert, next, rawget = assert, next, rawget
-local setmetatable = setmetatable
+local assert, next, setmetatable = assert, next, setmetatable
 local co_create = coroutine.create
 local co_resume = coroutine.resume
 local co_yield = coroutine.yield
 local co_running = coroutine.running
+local dbg_getinfo = debug.getinfo
 
 local diagnostics = require 'lift.diagnostics'
 local pcall = diagnostics.pcall
@@ -66,7 +66,7 @@ end
 local resumable = {}  -- map{future = arg} of threads ready to run
 
 -- Schedules a coroutine to be resumed with `arg` as soon as possible.
-local function schedule(future, arg)
+local function resume_soon(future, arg)
   resumable[future] = arg or false
 end
 
@@ -91,51 +91,80 @@ end
 ------------------------------------------------------------------------------
 
 local Future = {} -- Future class
+local unchecked_errors = {} -- map of raised, still unchecked errors
 
 function Future.__index(t, k)
-  -- accessing .results in a rejected future raises its error
-  if k == 'results' then error(t.error) end
+  if k == 'error' then -- getting a failed future's unchecked error
+    local err = unchecked_errors[t]
+    unchecked_errors[t] = nil
+    t.error = err
+    return err
+  elseif k == 'results' then  -- getting a failed future's results
+    error(t.error)            -- raises its error
+  end
   return Future[k]
 end
 
 function Future:__tostring()
-  return 'lift.async.Future('..tostring(self.f)..', '..tostring(self.arg)..')'
+  local info, arg = dbg_getinfo(self.f, 'S'), self.arg
+  return 'async(function<'..info.short_src..':'..info.linedefined..'>'..
+    (arg and ', ' or '')..(arg and tostring(arg) or '')..')'
 end
 
 -- Adds a function to be called when the future's thread finishes.
 -- Arguments passed to callback: future, error (or nil), results (table, or nil)
 function Future:on_ready(callback)
-  if self.ready then -- call callback immediately
-    callback(self, self.error, rawget(self, 'results'))
+  local status = self.status
+  if status then -- call callback immediately
+    if status == 'failed' then
+      callback(self, unchecked_errors[self] or self.error)
+    else -- fulfilled
+      callback(self, nil, self.results)
+    end
   else
     self[#self+1] = callback
   end
 end
 
--- Called by coroutines to execute a future.
-execute = function(future)
-  return {future.f(future.arg)}
+function Future:check_error()
+  local err = self.error
+  if err then error(err) end
 end
 
+-- Called by coroutines to execute a future.
+execute = diagnostics.trace('[thread] ${future} started',
+  function(future)
+    return {future.f(future.arg)}
+  end)
+
 -- Called by coroutines when a future completes execution.
-on_done = function(future, ok, res)
-  future.ready = true
-  local cb_err, cb_res -- callback arguments
-  if ok then -- future was fulfilled
-    cb_res = res
-    future.results = res
-  else -- future raised an error
-    cb_err = res
-    future.results = nil
-    future.error = res
-  end
-  -- call callbacks
-  for i = 1, #future do
-    future[i](future, cb_err, cb_res)
-  end
-  -- only reuse coroutine if callbacks didn't raise errors
-  co_free(future.co, future)
-end
+on_done = diagnostics.trace('[thread] ${future} ended with ${ok} ${res}',
+  function(future, ok, res)
+    local error_checked = true
+    local cb_err, cb_res -- callback arguments
+    if ok then -- future was fulfilled
+      cb_res = res
+      future.results = res
+      future.status = 'fulfilled'
+    else -- future raised an error
+      cb_err = res
+      error_checked = false
+      future.error = res
+      future.results = nil
+      future.status = 'failed'
+    end
+    -- call callbacks
+    for i = 1, #future do
+      local checked = future[i](future, cb_err, cb_res)
+      error_checked = error_checked or checked
+    end
+    if not error_checked then
+      future.error = nil
+      unchecked_errors[future] = res
+    end
+    -- only reuse coroutine if no errors are raised by callbacks
+    co_free(future.co, future)
+  end)
 
 ------------------------------------------------------------------------------
 -- Module Functions
@@ -144,10 +173,24 @@ end
 -- Schedules a function to be called asynchronously as `f(arg)` in a coroutine.
 -- Returns a future object for interfacing with the async call.
 local function async(f, arg)
-  local future = setmetatable({f = f, arg = arg,
-    co = false, ready = false, results = false}, Future)
+  local future = setmetatable({f = f, arg = arg, co = false,
+    error = false, results = false, status = false}, Future)
   resumable[future] = future
   return future
+end
+
+-- Raises all unchecked errors raised by finished threads.
+local function check_errors()
+  local future, err = next(unchecked_errors)
+  if not future then return end -- no errors
+  local list = {}
+  repeat
+    unchecked_errors[future] = nil
+    list[#list+1] = err
+    err.future = future
+    future, err = next(unchecked_errors)
+  until not future
+  diagnostics.aggregate("fatal: ${n} unchecked async error${s}", list):report()
 end
 
 -- Runs all async functions to completion. Call this from the main thread.
@@ -163,84 +206,95 @@ local function stop()
 end
 
 -- Suspends the calling thread until `future` becomes ready, or until `timeout`
--- milliseconds have passed. The timeout is optional, and if specified it
--- should be a positive integer. If the future is fulfilled, wait() returns
--- true and the future's results table; if wait() times out, it returns false.
--- If the future raises an error, wait() propagates the error.
+-- milliseconds have passed. The timeout is optional, and if specified must be
+-- a positive integer. If the future is fulfilled, wait() returns true and the
+-- future's results table. On timeout, wait() returns false and "timed out".
+-- If the future raises an error, wait() returns false and the error.
 local function wait(future, timeout)
-  local results = future.results
-  if results then return true, results end
+  local status = future.status
+  if status then -- future is ready
+    if status == 'failed' then return false, future.error end
+    return true, future.results
+  end
   local this_future = co_get()
   if future == this_future then error('future cannot wait for itself', 2) end
+  local results, err
   if timeout then
     local timer = uv_timer()
-    local function callback(future_or_timer, err, res)
+    local function callback(future_or_timer, e, res)
       if timer == nil then return end -- ignore second call
       if future_or_timer == timer then res = 'timed out' end
-      schedule(this_future, res)
+      err = e
+      resume_soon(this_future, res)
       timer:close()
       timer = nil
+      return true
     end
     timer:start(timeout, callback)
     future:on_ready(callback)
     results = co_yield()
-    if results == 'timed out' then return false end
+    if results == 'timed out' then return false, results end
   else
-    future:on_ready(function(_, err, res)
-      schedule(this_future, res)
+    future:on_ready(function(_, e, res)
+      err = e
+      resume_soon(this_future, res)
+      return true
     end)
     results = co_yield()
   end
-  if not results then error(future.error) end
+  if err then
+    err.future = future
+    return false, err
+  end
   return true, results
 end
 
--- Suspends the calling thread until one future from the list becomes ready.
--- Either returns the first fulfilled future, or raises the first raised error.
+-- Suspends the calling thread until any future from the list becomes ready.
+-- Either returns the first fulfilled future, or nil and the first error.
 local function wait_any(futures)
   -- first we check if any future is currently ready
   local n, this_future = #futures, co_get()
   for i = 1, n do
     local f = futures[i]
     if f == this_future then error('future cannot wait for itself', 2) end
-    if f.results then return f end -- this will also raise any error
+    local status = f.status
+    if status then -- future is ready
+      if status == 'failed' then return nil, f.error end
+      return f
+    end
   end
-  local done, first_err = false
+  local first, first_err
   local function callback(future, err, res)
-    if done then return end
-    done = true
+    if first then return false end
+    first = future
     first_err = err
-    schedule(this_future, future)
+    resume_soon(this_future)
+    return true
   end
   for i = 1, n do
     futures[i]:on_ready(callback)
   end
-  local first = co_yield()
-  if first_err then error(first_err) end
+  co_yield()
+  if first_err then
+    first_err.future = first
+    return nil, first_err
+  end
   return first
 end
 
--- used by wait_all() as diagnostic:format()
-local function format_errors(d)
-  local loc, nested = d.location, d.nested
-  local s = loc.file..':'..loc.line..': '..d.message
-  for i = 1, #nested do
-    s = s..'\n  ('..i..') '..tostring(nested[i])
-  end
-  return s
-end
-
 -- Suspends the calling thread until all futures in the list become ready.
--- If at least one future raises an error, wait_all() will raise an aggregate
--- error (a diagnostic) object that lits all errors raised by the futures.
+-- Returns true when all futures are fulfilled, or false and a diagnostic
+-- object when errors occur (the diagnostic aggregates all raised errors).
 local function wait_all(futures)
   local n, errors, this_future = #futures, nil, co_get()
   local function callback(future, err, res)
     if err then
       if not errors then errors = {err} else errors [#errors+1] = err end
+      err.future = future -- keep track of which future raised the error
     end
     n = n - 1
-    if n == 0 then schedule(this_future) end
+    if n == 0 then resume_soon(this_future) end
+    return true
   end
   for i = 1, n do
     local f = futures[i]
@@ -248,20 +302,16 @@ local function wait_all(futures)
     f:on_ready(callback)
   end
   if n > 0 then co_yield() end
-  if errors then
-    local d = diagnostics.new('fatal: wait_all() caught '):function_location(2)
-    d[0] = d[0]..#errors..(#errors > 1 and ' errors' or ' error')
-    d.nested = errors
-    d.format = format_errors
-    error(d)
-  end
+  if not errors then return true end
+  return false, diagnostics.aggregate(
+    'fatal: wait_all() caught ${n} error${s}', errors):traceback(2)
 end
 
 -- Suspends the calling thread until `dt` milliseconds have passed.
 -- Returns the elapsed time spent sleeping, in milliseconds.
 local function sleep(dt)
   local timer, this_future = uv_timer(), co_get()
-  timer:start(dt, function() schedule(this_future) end)
+  timer:start(dt, function() resume_soon(this_future) end)
   local t0 = uv_now()
   co_yield()
   timer:close()
@@ -274,6 +324,7 @@ end
 
 return setmetatable({
   async = async,
+  check_errors = check_errors,
   run = run,
   sleep = sleep,
   stop = stop,

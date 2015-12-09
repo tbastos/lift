@@ -1,9 +1,8 @@
 #!/usr/bin/env lua
 
---collectgarbage('stop') -- disable GC by default
-
 local cli = require 'lift.cli'
 local task = require 'lift.task'
+local async = require 'lift.async'
 local config = require 'lift.config'
 local loader = require 'lift.loader'
 local diagnostics = require 'lift.diagnostics'
@@ -16,12 +15,13 @@ os.exit(diagnostics.wrap(function()
   -- parse key=value configs at the beginning of arg list
   local cli_scope = config:new_parent('cli')
   cli.parse_config(arg)
+  diagnostics.set_tracing(config:get_bool('tracing'))
+
+  -- add 'lift executable'-specific files to the ${load_path}
+  config:insert_unique('load_path', config.LIFT_SRC_DIR..'/files/lift')
 
   -- run init scripts
   local top_scope = loader.init()
-
-  -- add files specific to the 'lift' executable to the ${load_path}
-  config:insert_unique('load_path', config.LIFT_SRC_DIR..'/files/lift')
 
   -- make cli configs override init configs
   assert(top_scope:get_parent() == cli_scope)
@@ -33,13 +33,20 @@ os.exit(diagnostics.wrap(function()
   local app = cli.new()
   loader.load_all('cli', nil, app)
 
-  -- default command is an alias for the 'run' command
+  -- default command is an alias to the 'task run' command
   app:delegate_to(app:get_command('task run'))
 
+  -- command 'list' is an alias to 'task list'
   app:command 'list' :delegate_to(app:get_command 'task list')
     :desc('list [pattern]', 'Show list of tasks (that match a pattern)')
 
-  -- process CLI
-  app:process(arg)
+  -- run the CLI in a new thread
+  local future = async(function()
+    return app:process(arg)
+  end)
+
+  async.run() -- main loop
+  future:check_error() -- propagate CLI errors
+  async.check_errors() -- propagate unchecked errors from other threads
 
 end))

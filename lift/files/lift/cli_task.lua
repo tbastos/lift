@@ -46,19 +46,19 @@ end
 local list_cmd = task_cmd:command 'list'
   :desc('list [pattern]', 'Print tasks that match an optional pattern')
 
-local function list_group(group, pattern)
-  local tasks, count = group.tasks, 0
+local function list_namespace(ns, pattern)
+  local tasks, count = ns.tasks, 0
   for i, name in ipairs(utils.keys_sorted(tasks)) do
     local full_name = tostring(tasks[name])
     if full_name:find(pattern) then -- filter by pattern
       count = count + 1
       local indent = (' '):rep(30 - #full_name)
-      write(full_name, indent, ESC'dim', '-- undocumented task\n', ESC'clear')
+      write(full_name, indent, ESC'dim', '-- undocumented task', ESC'clear', '\n')
     end
   end
-  local subgroups = group.children
-  for i, name in ipairs(utils.keys_sorted(subgroups)) do
-    count = count + list_group(subgroups[name], pattern)
+  local nested = ns.nested
+  for i, name in ipairs(utils.keys_sorted(nested)) do
+    count = count + list_namespace(nested[name], pattern)
   end
   return count
 end
@@ -68,7 +68,7 @@ function list_cmd:run()
   if #self.args > 0 then
     pattern = self:consume 'pattern'
   end
-  local count = list_group(task, pattern)
-  local suffix = (pattern == '.' and '\n' or (" with pattern '"..pattern.."'"))
-  write(ESC'dim', '-- Found ', count, ' tasks', suffix, ESC'clear')
+  local count = list_namespace(task, pattern)
+  local suffix = (pattern == '.' and '' or (" with pattern '"..pattern.."'"))
+  write(ESC'dim', '-- Found ', count, ' tasks', suffix, ESC'clear', '\n')
 end

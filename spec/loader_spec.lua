@@ -49,14 +49,14 @@ describe("lift.loader", function()
       assert.same({'A','a','b','c','d'}, config.list)
 
       config.load_path = 'spec/files;spec/files/invalid'
-      assert.error_matches(function() loader.init() end, 'unexpected symbol')
+      assert.error_match(function() loader.init() end, 'unexpected symbol')
     end)
 
     it("detects project_dir based on presence of Liftfile.lua", function()
       assert.Nil(config.project_dir)
       config.cwd = 'spec/files/invalid/foo'
-      assert.error_matches(function() loader.init() end,
-        "Liftfile.lua:1: unexpected symbol")
+      assert.error_match(function() loader.init() end,
+        "Liftfile.lua:1: lua_syntax_error: unexpected symbol")
       assert.matches(config.project_dir, 'spec/files/invalid')
       assert.matches(config.project_file, 'spec/files/invalid/Liftfile.lua')
     end)

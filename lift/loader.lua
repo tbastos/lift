@@ -2,8 +2,8 @@
 -- Find and Load Lua Files in the ${load_path}
 ------------------------------------------------------------------------------
 
-local loadfile = loadfile
-local str_find = string.find
+local assert, loadfile = assert, loadfile
+local str_find, str_match, str_sub = string.find, string.match, string.sub
 
 local path = require 'lift.path'
 local config = require 'lift.config'
@@ -25,7 +25,8 @@ local function find_scripts(type, subtype, reverse_order)
   local subpatt = '^'..subtype..'(_?)(.*)%.lua$'
   local i, si = (reverse_order and #load_path or 1), reverse_order and -1 or 1
   local dir, dir_names, dir_i, subdir, sub_names, sub_i
-  return function() -- goto's made this code simpler!
+  return function()
+    -- this code is simpler with goto's
     local _, _name, _e, _sep, _sub
     if subdir then goto ITERATE_SUBDIR end
     if dir then goto ITERATE_DIR end
@@ -62,32 +63,34 @@ local function find_scripts(type, subtype, reverse_order)
   end
 end
 
-local function _load_file(filename, ...)
-  local chunk, err = loadfile(path.from_slash(filename), 't')
-  if chunk then
-    chunk(...)
-  else
-    diagnostics.new('lua_error: ${1}', err):report()
-  end
-end
+-- custom diagnostic for Lua syntax errors
+diagnostics.levels.lua_syntax_error = 'fatal'
+diagnostics.styles.lua_syntax_error = {prefix = 'syntax error:', fg = 'red'}
 
-local function load_file(filename, ...)
-  diagnostics.trace('Loading '..filename, _load_file, filename, ...)
-end
+local load_file = diagnostics.trace('[loader] loading ${filename}',
+  function(filename, ...)
+    local chunk, err = loadfile(path.from_slash(filename), 't')
+    if chunk then
+      chunk(...)
+    else
+      local file, line, e = str_match(err, '^([^:]+):([^:]+): ()')
+      assert(file == filename)
+      local msg = str_sub(err, e)
+      diagnostics.new{'lua_syntax_error: ', message = msg,
+        location = {file = file, line = tonumber(line)}}:report()
+    end
+  end)
 
-local function _load_all(type, subtype, ...)
-  for filename in find_scripts(type, subtype) do
-    load_file(filename, ...)
-  end
-end
+local load_all = diagnostics.trace(
+  '[loader] running all ${type} ${subtype} scripts',
+  '[loader] finished all ${type} ${subtype} scripts',
+  function(type, subtype, ...)
+    for filename in find_scripts(type, subtype) do
+      load_file(filename, ...)
+    end
+  end)
 
-local function load_all(type, subtype, ...)
-  local substr = subtype and ' ('..subtype..')' or ''
-  diagnostics.trace('Running '..type..substr..' scripts',
-    _load_all, type, subtype, ...)
-end
-
-local function _init(filename)
+local function run_init(filename)
   local scope = config:new_parent(filename)
   load_file(filename, scope)
   return scope
@@ -98,26 +101,26 @@ end
 -- Other scripts are then loaded in the reverse order of entry in ${load_path}.
 -- This usually means that system configs are loaded next, then user configs,
 -- then local filesystem (project) configs.
-local function init()
-  diagnostics.set_tracing(config:get_bool('tracing'))
-  local top_scope
-  diagnostics.trace('Running init scripts', function()
-    -- run built-in init script
+local init = diagnostics.trace(
+  '[loader] running init scripts',
+  '[loader] finished init scripts',
+  function()
+    local top_scope -- keep track of the top config scope
+    -- run the built-in init script
     local builtin_files = config.LIFT_SRC_DIR..'/files'
-    top_scope = _init(builtin_files..'/init.lua')
-    -- run init scripts in ${load_path}
+    top_scope = run_init(builtin_files..'/init.lua')
+    -- run all init scripts in ${load_path}
     for script in find_scripts('init', nil, true) do
-      _init(script)
+      run_init(script)
     end
     -- run ${project_file} if available
     if config.project_file then
-      _init(config.project_file)
+      run_init(config.project_file)
     end
     -- add built-in files to the ${load_path}
     config:insert_unique('load_path', builtin_files)
+    return top_scope
   end)
-  return top_scope
-end
 
 return {
   find_scripts = find_scripts,

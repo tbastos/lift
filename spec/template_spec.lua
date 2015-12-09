@@ -77,9 +77,9 @@ pi = 3.1415
     config.reset()
     config:new_parent('cli')
     config.load_path = 'spec/files'
-    assert.error_matches(function() render_file('non_existing.lua') end,
+    assert.error_match(function() render_file('non_existing.lua') end,
       "cannot find template 'non_existing.lua'")
-    assert.error_matches(function() render_file('templates/invalid.lua') end,
+    assert.error_match(function() render_file('templates/invalid.lua') end,
       "invalid.lua:2:")
   end)
 

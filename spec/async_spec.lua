@@ -1,5 +1,7 @@
 expose("lift.async", function()
 
+  local function fa(n) return n end -- keep this at line 3
+
   local uv = require 'lluv'
   local async = require 'lift.async'
 
@@ -22,33 +24,36 @@ expose("lift.async", function()
   end)
 
   it("forbids the main thread from blocking", function()
-    assert.error_matches(function() async.sleep(10) end, 
+    assert.error_match(function() async.sleep(10) end, 
       'not in a lift.async coroutine')
   end)
 
   describe("a future", function()
     it("stores all function .results in a list", function()
-      local function f_a(arg, extra) return 1, 2, arg, extra end
-      local function f_b() return nil, 'omg' end
-      local a = async(f_a, 1337, 'nope')
-      local b = async(f_b)
-      assert.matches('lift.async.Future%(.*, 1337%)', tostring(a))
+      local function fb(arg, extra) return 1, 2, arg, extra end
+      local function fc() return nil, 'omg' end
+      local a = async(fa, 1337)
+      local b = async(fb, 3.14, 'nope')
+      local c = async(fc)
+      assert.match('async%(function<spec/async_spec.lua:3>, 1337%)', a)
       assert.falsy(a.results)
       assert.falsy(b.results)
-      assert.False(a.ready)
-      assert.False(b.ready)
+      assert.falsy(c.results)
+      assert.False(a.status)
+      assert.False(b.status)
+      assert.False(c.status)
       async.run()
-      assert.True(a.ready)
-      assert.True(b.ready)
-      assert.same({1, 2, 1337}, a.results)
-      assert.same({nil, 'omg'}, b.results)
+      assert.equal('fulfilled', a.status, b.status, c.status)
+      assert.same({1337}, a.results)
+      assert.same({1, 2, 3.14}, b.results)
+      assert.same({nil, 'omg'}, c.results)
     end)
     it("stores errors in .error", function()
       local f = async(function() error('boom') end)
       assert.falsy(f.error)
-      assert.False(f.ready)
+      assert.False(f.status)
       async.run()
-      assert.True(f.ready)
+      assert.equal('failed', f.status)
       assert.matches('boom', tostring(f.error))
     end)
     it("propagates errors when .results is accessed", function()
@@ -56,7 +61,7 @@ expose("lift.async", function()
       assert.falsy(f.error)
       assert.falsy(f.results)
       async.run()
-      assert.error_matches(function() return f.results end, 'boom')
+      assert.error_match(function() return f.results end, 'boom')
     end)
     it("supports callbacks for when it becomes ready", function()
       local v = 0
@@ -84,6 +89,7 @@ expose("lift.async", function()
       assert.near(60, sleep_60.results[1], TOLERANCE)
       assert.near(90, sleep_90.results[1], TOLERANCE)
       assert.near(90, elapsed, TOLERANCE)
+      async.check_errors() -- no unchecked errors
     end)
 
     it("can wait() for another coroutine to finish", function()
@@ -106,14 +112,20 @@ expose("lift.async", function()
       local function wait_self() return async.wait(future) end
       future = async(wait_self)
       async.run()
-      assert.error_matches(function() return future.results end,
+      assert.error_match(function() return future.results end,
         'future cannot wait for itself')
-      -- error propagation
+      -- catching errors
       local function boom() error('booom!') end
-      local function wait_boom() async.wait(async(boom)) end
-      future = async(wait_boom)
+      local function wait_boom() return async.wait(async(boom)) end
+      local function assert_wait_boom() assert(async.wait(async(boom))) end
+      local only_wait, assert_wait = async(wait_boom), async(assert_wait_boom)
       async.run()
-      assert.matches('booom!', tostring(future.error))
+      assert.falsy(only_wait.error)
+      assert.falsy(only_wait.results[1])
+      assert.match('booom!', only_wait.results[2])
+      assert.match('booom!', assert_wait.error)
+      assert.error_match(function() return assert_wait.results end, 'booom!')
+      async.check_errors() -- no unchecked errors
     end)
 
     it("can wait() for a coroutine with a timeout", function()
@@ -124,17 +136,16 @@ expose("lift.async", function()
       -- successfully wait for a short task
       local f = async(impatient_wait, async(short_task))
       async.run()
-      assert.True(f.results[1])
-      assert.same({1}, f.results[2])
+      assert.same({true, {1}}, f.results)
       -- unsuccessfully wait for a long task
       f = async(impatient_wait, async(long_task))
       async.run()
-      assert.False(f.results[1])
+      assert.same({false, 'timed out'}, f.results)
       -- successfully wait for a long task
       f = async(patient_wait, async(long_task))
       async.run()
-      assert.True(f.results[1])
-      assert.same({2}, f.results[2])
+      assert.same({true, {2}}, f.results)
+      async.check_errors() -- no unchecked errors
     end)
 
     it("can wait_any() one of multiple coroutines to finish", function()
@@ -168,10 +179,11 @@ expose("lift.async", function()
       -- wait for an error
       local a = async(sleep, 1)
       local b = async(function() error('boom') end)
-      future = async(function() async.wait_any{a, b} end)
+      future = async(function() assert(async.wait_any{a, b}) end)
       async.run()
       assert.equal(b.error, future.error)
       assert.matches('boom', tostring(future.error))
+      async.check_errors() -- no unchecked errors
     end)
 
     it("can wait_all() multiple coroutines to finish", function()
@@ -181,7 +193,7 @@ expose("lift.async", function()
         list[i] = async(sleep, i * TOLERANCE)
       end
       local function main()
-        async.wait_all(list)
+        assert(async.wait_all(list))
         local count = 0 -- fulfilled futures
         for i = 1, n do
           if list[i].results then
@@ -199,16 +211,30 @@ expose("lift.async", function()
       -- add some errors to the mix
       local function raise(i)
         async.sleep(i * TOLERANCE)
-        error('error #'..i)
+        error('my error #'..i)
       end
       list[n+1] = async(raise, 1)
       list[n+2] = async(raise, 2)
       future = async(main)
       async.run()
-      assert.matches('caught 2 errors.*error #1.*error #2',
+      assert.matches('caught 2 errors.*my error #1.*my error #2',
         tostring(future.error))
+      async.check_errors() -- no unchecked errors
     end)
 
+  end)
+
+  it("keeps track of unchecked errors", function()
+    local function boom() error('boom') end
+    local function unchecked(future) return future.results end
+    local checked_a = async(boom)
+    local checked_b = async(boom)
+    async(unchecked, checked_a) -- checks checked_a
+    async(unchecked, checked_a) -- checks checked_a
+    async.run()
+    local _ = checked_b.error -- checks checked_b
+    assert.error_match(function() async.check_errors() end,
+      '2 unchecked async errors')
   end)
 
 end)

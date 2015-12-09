@@ -54,17 +54,17 @@ local function escape_magic(str)
 end
 
 -- Converts a basic glob pattern to a Lua pattern. Supports '*', '?'
--- and Lua-style [character sets]. Use charsets to escape: '[*]'.
+-- and Lua-style [character classes]. Use a char class to escape: '[*]'.
 local glob_to_lua = { ['^'] = '%^', ['$'] = '%$', ['%'] = '%%',
   ['('] = '%(', [')'] = '%)', ['.'] = '%.', ['['] = '%[', [']'] = '%]',
   ['+'] = '%+', ['-'] = '%-', ['?'] = '[^/]', ['*'] = '[^/]*' }
 local function from_glob(glob)
-  -- copy [charsets] verbatim; translate magic chars everywhere else
+  -- copy [char-classes] verbatim; translate magic chars everywhere else
   local i, res = 1, ''
   repeat
-    local s, e, charset = str_find(glob, '(%[.-%])', i)
+    local s, e, cclass = str_find(glob, '(%[.-%])', i)
     local before = str_sub(glob, i, s and s - 1)
-    res = res..str_gsub(before, '[$^%().[%]*+-?]', glob_to_lua)..(charset or '')
+    res = res..str_gsub(before, '[$^%().[%]*+-?]', glob_to_lua)..(cclass or '')
     i = e and e + 1
   until not i
   return res

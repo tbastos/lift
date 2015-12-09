@@ -17,7 +17,7 @@ describe('lift.config', function()
     it('has immutable vars', function()
       config.set_const('MY_CONST', 42)
       assert.equal(42, config.MY_CONST)
-      assert.error_matches(function() config.MY_CONST = 1 end, 'cannot be changed')
+      assert.error_match(function() config.MY_CONST = 1 end, 'cannot be changed')
     end)
 
     it('reads env vars as a fallback', function()

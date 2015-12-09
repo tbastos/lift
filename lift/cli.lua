@@ -61,20 +61,23 @@ end
 function Command:matched(args) self.args = args end
 
 -- runs the command with error handling
-function Command:__call()
-  local err = self:run() -- returns nil on success, string on error
-  if err then self:error('${1}', err) end
-  local args = self.args
-  if args then
-    local used = args.used
-    if used and used < #args then
-      diagnostics.report("warning: unused argument '${1}'", args[used + 1])
+Command.__call = diagnostics.trace(
+  '[cli] running ${self}', '[cli] finished ${self}',
+  function(self)
+    local err = self:run() -- returns nil on success, string on error
+    if err then self:error('${1}', err) end
+    local args = self.args
+    if args then
+      local used = args.used
+      if used and used < #args then
+        diagnostics.report("warning: unused argument '${1}'", args[used + 1])
+      end
     end
-  end
-end
+  end)
 
 function Command:__tostring()
-  return self.name
+  if self.name == '' then return 'root command' end
+  return "command '"..self.name.."'"
 end
 
 -- the default action for all commands is to print help and exit
@@ -98,7 +101,7 @@ end
 local function delegate(delegator)
   local delegatee = assert(delegator.delegatee)
   delegatee.args = delegator.args
-  return delegatee()
+  return delegatee:run()
 end
 function Command:delegate_to(other_command)
   if getmetatable(other_command) ~= Command then
@@ -137,7 +140,7 @@ function Command:get_command(name)
   for s in name:gmatch('([^ ]+)[ ]*') do
     local child = cmd.commands[s]
     if not child then
-      error("no such command '"..tostring(cmd)..' '..s.."'", 2)
+      error("no such command '"..name.."'", 2)
     end
     cmd = child
   end
@@ -205,8 +208,8 @@ local function process_option(option, value, next_arg)
 end
 
 -- Processes options, matches args to (sub)command and invokes (sub)command.
-function Command:process(args)
-  diagnostics.trace('Processing cli args ${args}', function()
+Command.process = diagnostics.trace('[cli] processing args ${args}',
+  function(self, args)
     assert(type(args) == 'table', 'missing args')
     assert(self.parent == nil, 'not a root command')
     local opts, cmd_args, num_args, i, last = true, {}, 0, 1, #args
@@ -246,7 +249,6 @@ function Command:process(args)
     self:matched(cmd_args)
     self()
   end)
-end
 
 ------------------------------------------------------------------------------
 -- Help System

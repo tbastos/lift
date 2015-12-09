@@ -188,12 +188,12 @@ end
 ------------------------------------------------------------------------------
 -- Globbing: shell-style glob patterns and n-fold ${variable} expansions
 ------------------------------------------------------------------------------
--- Supports wildcards (**/, *, ?, [charsets]) and n-fold ${var} expansions.
+-- Supports wildcards (**/, *, ?, [cclass]) and n-fold ${var} expansions.
 -- A '**' matches 0 or more directories. It must adjoin '/'s, as in '**/'.
 -- A '*' matches 0 or more characters (but never '/').
 -- A '?' matches any single character (but not '/').
--- A [charset] matches a character in the set (use [^...] for set complement).
---   Caveat: charsets cannot contain the character '/'
+-- A [cclass] matches a character in the set (use [^...] for set complement).
+--   Caveat: the character '/' cannot be included in a [cclass].
 -- All ${variables} are expanded and matched as plain strings (no patterns).
 -- Special case: if ${var} is a list, each element is tested to match the path.
 

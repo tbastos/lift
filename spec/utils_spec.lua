@@ -5,7 +5,7 @@ describe("lift.utils", function()
   it("offers keys_sorted()", function()
     assert.same({}, utils.keys_sorted{})
     assert.same({'a', 'bb', 'ccc'}, utils.keys_sorted{bb = 7, ccc = 5, a = 9})
-    assert.error_matches(function() utils.keys_sorted'str' end,
+    assert.error_match(function() utils.keys_sorted'str' end,
       'table expected, got string')
   end)
 
