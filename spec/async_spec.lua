@@ -226,13 +226,13 @@ expose("lift.async", function()
 
   it("keeps track of unchecked errors", function()
     local function boom() error('boom') end
-    local function unchecked(future) return future.results end
-    local checked_a = async(boom)
-    local checked_b = async(boom)
-    async(unchecked, checked_a) -- checks checked_a
-    async(unchecked, checked_a) -- checks checked_a
+    local a = async(boom, 1)
+    local b = async(boom, 2)
+    local function unchecked(future) async.wait(a) return a.results end
+    async(unchecked, 3)
+    async(unchecked, 4)
     async.run()
-    local _ = checked_b.error -- checks checked_b
+    local _ = b.error -- checks checked_b
     assert.error_match(function() async.check_errors() end,
       '2 unchecked async errors')
   end)

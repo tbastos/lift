@@ -93,14 +93,14 @@ end
 local Future = {} -- Future class
 local unchecked_errors = {} -- map of raised, still unchecked errors
 
-function Future.__index(t, k)
+function Future:__index(k)
   if k == 'error' then -- getting a failed future's unchecked error
-    local err = unchecked_errors[t]
-    unchecked_errors[t] = nil
-    t.error = err
+    local err = assert(unchecked_errors[self])
+    unchecked_errors[self] = nil
+    self.error = err
     return err
   elseif k == 'results' then  -- getting a failed future's results
-    error(t.error)            -- raises its error
+    error(self.error)            -- raises its error
   end
   return Future[k]
 end
