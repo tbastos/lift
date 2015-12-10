@@ -9,6 +9,7 @@ local co_yield = coroutine.yield
 local co_running = coroutine.running
 local dbg_getinfo = debug.getinfo
 
+local to_slash = require('lift.path').to_slash
 local diagnostics = require 'lift.diagnostics'
 local pcall = diagnostics.pcall
 
@@ -107,7 +108,8 @@ end
 
 function Future:__tostring()
   local info, arg = dbg_getinfo(self.f, 'S'), self.arg
-  return 'async(function<'..info.short_src..':'..info.linedefined..'>'..
+  local file = to_slash(info.short_src)
+  return 'async(function<'..file..':'..info.linedefined..'>'..
     (arg and ', ' or '')..(arg and tostring(arg) or '')..')'
 end
 

@@ -2,7 +2,7 @@
 -- Find and Load Lua Files in the ${load_path}
 ------------------------------------------------------------------------------
 
-local assert, loadfile = assert, loadfile
+local loadfile = loadfile
 local str_find, str_match, str_sub = string.find, string.match, string.sub
 
 local path = require 'lift.path'
@@ -73,8 +73,11 @@ local load_file = diagnostics.trace('[loader] loading ${filename}',
     if chunk then
       chunk(...)
     else
-      local file, line, e = str_match(err, '^([^:]+):([^:]+): ()')
-      assert(file == filename)
+      local file, line, e = str_match(err, '^(..[^:]+):([^:]+): ()')
+      file = file and path.to_slash(file)
+      if file ~= filename then
+        error('unexpected error format: '..err)
+      end
       local msg = str_sub(err, e)
       diagnostics.new{'lua_syntax_error: ', message = msg,
         location = {file = file, line = tonumber(line)}}:report()

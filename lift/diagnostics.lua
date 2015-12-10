@@ -19,6 +19,8 @@ local str_rep, str_sub = string.rep, string.sub
 local dbg_getinfo, dbg_getlocal = debug.getinfo, debug.getlocal
 local dbg_traceback = debug.traceback
 
+local to_slash = require('lift.path').to_slash
+
 local ls = require 'lift.string'
 local ls_expand, ls_format, ls_capitalize = ls.expand, ls.format, ls.capitalize
 
@@ -164,7 +166,8 @@ function Diagnostic:set_location(level_or_f)
     info = dbg_getinfo(level_or_f, 'S')
     line = info.linedefined
   end
-  self.location = {file = info.short_src, line = line}
+  local file = to_slash(info.short_src)
+  self.location = {file = file, line = line}
   return self
 end
 
@@ -383,7 +386,8 @@ local function to_diagnostic(err, level)
   if is_a(err) then return err end
   local d = new("lua_error: ${1}", err):set_location(level):traceback(level)
   if type(err) == 'string' then -- try to remove file:line: from the string
-    local file, line, e = str_match(err, '^([^:]+):([^:]+): ()')
+    local file, line, e = str_match(err, '^(..[^:]+):([^:]+): ()')
+    file = file and to_slash(file)
     local loc = d.location
     if file == loc.file and tonumber(line) == loc.line then
       d[1] = str_sub(err, e) -- remove redundant information
