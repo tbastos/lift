@@ -35,6 +35,7 @@ local function find_scripts(type, subtype, reverse_order)
     ::ITERATE_LOAD_PATH:: dir = load_path[i] ; i = i + si
     if not dir then return nil end
     dir_i, dir_names = 1, scan_dir(dir)
+    if not dir_names then error("invalid ${load_path} dir '"..dir.."'") end
 
     ::ITERATE_DIR:: _name = dir_names[dir_i] ; dir_i = dir_i + 1
       if not _name then goto ITERATE_LOAD_PATH end

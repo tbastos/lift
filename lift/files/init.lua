@@ -8,11 +8,6 @@ local path = require 'lift.path'
 local ls = require 'lift.string'
 local WINDOWS = require'lift.util'.WINDOWS
 
--- Current working directory
-if not config.cwd then
-  config.cwd = path.cwd()
-end
-
 -- Default editor
 if not config.editor then
   local v = config.EDITOR
@@ -30,9 +25,9 @@ if not config.project_file_names then
   }
 end
 
--- Default project_dir_name
-if not config.project_files_dir_name then
-  config.project_files_dir_name = '.'..config.APP_ID
+-- Default project_files_dir
+if not config.project_files_dir then
+  config.project_files_dir = '.'..config.APP_ID
 end
 
 ------------------------------------------------------------------------------
@@ -40,7 +35,7 @@ end
 ------------------------------------------------------------------------------
 
 (function()
-  local dir = config.cwd
+  local dir = fs.cwd()
   repeat
     for i, name in ipairs(config.project_file_names) do
       local file = dir..'/'..name
@@ -50,13 +45,17 @@ end
         return
       end
     end
-    if fs.is_dir(dir..'/'..config.project_files_dir_name) then
+    if fs.is_dir(dir..'/'..config.project_files_dir) then
       config.project_dir = dir
       return
     end
     dir = path.dir(dir)
   until #dir <= 1 or path.is_root(dir)
 end)()
+
+if config.project_dir then
+  fs.chdir(config.project_dir)
+end
 
 ------------------------------------------------------------------------------
 -- Portable Directory Paths: {system,user}_{config,data}_dir and cache_dir
@@ -124,7 +123,7 @@ end
 
 -- project-specific files
 if config.project_dir then
-  add_path(config.project_dir..'/'..config.project_files_dir_name)
+  add_path(config.project_dir..'/'..config.project_files_dir)
 end
 
 -- user and system-specific files

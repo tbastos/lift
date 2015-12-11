@@ -18,7 +18,7 @@ local ls = require 'lift.string'
 local from_glob, split_string = ls.from_glob, ls.split
 
 local uv = require 'lluv'
-local uv_mkdir, uv_rmdir = uv.fs_mkdir, uv.fs_rmdir
+local uv_chdir, uv_mkdir, uv_rmdir = uv.chdir, uv.fs_mkdir, uv.fs_rmdir
 local uv_cwd, uv_stat, uv_scandir = uv.cwd, uv.fs_stat, uv.fs_scandir
 
 ------------------------------------------------------------------------------
@@ -26,6 +26,7 @@ local uv_cwd, uv_stat, uv_scandir = uv.cwd, uv.fs_stat, uv.fs_scandir
 ------------------------------------------------------------------------------
 
 local function cwd() return to_slash(uv_cwd()) end
+local function chdir(path) return uv_chdir(from_slash(path)) end
 local function stat(path) return uv_stat(from_slash(path)) end
 local function mkdir(path) return uv_mkdir(from_slash(path), 493) end -- 493 = 0755
 local function rmdir(path) return uv_rmdir(from_slash(path)) end
@@ -231,6 +232,7 @@ end
 ------------------------------------------------------------------------------
 
 return {
+  chdir = chdir,
   cwd = cwd,
   glob = glob,
   glob_parse = glob_parse,      -- exported for testing

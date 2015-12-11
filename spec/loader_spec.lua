@@ -1,5 +1,6 @@
 describe("lift.loader", function()
 
+  local fs = require 'lift.fs'
   local path = require 'lift.path'
   local loader = require 'lift.loader'
   local config = require 'lift.config'
@@ -9,7 +10,7 @@ describe("lift.loader", function()
     diagnostics.Verifier.set_new()
     config.reset()
     config:new_parent('cli')
-    config.load_path = 'spec/files;'..config.LIFT_SRC_DIR..'/files'
+    config.load_path = config.LIFT_SRC_DIR..'/files'
   end)
 
   local function count(iterator)
@@ -34,13 +35,21 @@ describe("lift.loader", function()
   describe("init()", function()
     local spec_dir = path.clean(config.LIFT_SRC_DIR..'/../spec')
 
+    -- change the CWD during a call to f
+    local function init_in_dir(dir)
+      local cwd = fs.cwd()
+      assert(fs.chdir(dir))
+      local ok, err = pcall(loader.init, loader)
+      assert(fs.chdir(cwd))
+      if not ok then error(err, 0) end
+    end
+
     it('runs init scripts ir the order listed in the ${load_path}', function()
       assert.Nil(config.pi)
-      config.cwd = spec_dir..'/files'
-      config.load_path = 'spec/files'
-      config.user_config_dir = 'spec/files/user'
-      config.system_config_dir = 'spec/files/system'
-      loader.init()
+      config.load_path = 'files'
+      config.user_config_dir = 'files/user'
+      config.system_config_dir = 'files/system'
+      init_in_dir(spec_dir..'/files/templates')
       assert.equal(spec_dir, config.project_dir)
       assert.equal(spec_dir..'/Liftfile.lua', config.project_file)
       assert.equal(config.APP_VERSION, config.LIFT_VERSION)
@@ -48,24 +57,24 @@ describe("lift.loader", function()
       assert.equal('user', config.opt1)
       assert.same({'A','a','b','c','d'}, config.list)
 
-      config.load_path = 'spec/files;spec/files/invalid'
-      assert.error_match(function() loader.init() end, 'unexpected symbol')
+      config.load_path = 'files;files/invalid'
+      assert.error_match(function()
+        init_in_dir(spec_dir..'/files/templates')
+      end, 'unexpected symbol')
     end)
 
     it("detects project_dir based on presence of Liftfile.lua", function()
       assert.Nil(config.project_dir)
-      config.cwd = 'spec/files/invalid/foo'
-      assert.error_match(function() loader.init() end,
+      assert.error_match(function() init_in_dir(spec_dir..'/files/invalid/foo') end,
         "Liftfile.lua:1: lua_syntax_error: unexpected symbol")
-      assert.matches(config.project_dir, 'spec/files/invalid')
-      assert.matches(config.project_file, 'spec/files/invalid/Liftfile.lua')
+      assert.matches('spec/files/invalid', config.project_dir)
+      assert.matches('spec/files/invalid/Liftfile.lua', config.project_file)
     end)
 
     it("detects project_dir based on presence of .lift dir", function()
       assert.Nil(config.project_dir)
-      config.cwd = 'spec/files/project1'
-      loader.init()
-      assert.matches(config.project_dir, 'spec/files/project1')
+      init_in_dir(spec_dir..'/files/project1')
+      assert.matches('files/project1', config.project_dir)
       assert.Nil(config.project_file)
     end)
 

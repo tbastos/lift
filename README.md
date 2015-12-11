@@ -8,7 +8,7 @@ Lift is both a **task automation tool** and a **framework** for writing command-
 
 ## Features
 - Tasks and dependencies are concisely written as Lua functions and can run in parallel.
-- Transparent multitasking based on coroutines and _asynchronous I/O_ backed by [libuv].
+- Transparent multitasking based on coroutines and _asynchronous I/O_ (using [libuv]).
 - Diagnostics engine for high-quality error reporting, testing and tracing.
 - Composable command-line interfaces based on command hierarchies.
 - Scoped configuration system that gets values from the CLI, environment and Lua files.
