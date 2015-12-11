@@ -19,8 +19,8 @@ local DELIMITER   -- Platform-specific path delimiter (':' or ';')
 
 if WINDOWS then
   SEP, DELIMITER = '\\', ';'
-  to_slash = function(path) return str_lower(str_gsub(path, SEP, '/')) end
-  from_slash = function(path) return str_gsub(path, '/', SEP) end
+  to_slash = function(path) return (str_lower(str_gsub(path, SEP, '/'))) end
+  from_slash = function(path) return (str_gsub(path, '/', SEP)) end
 else
   SEP, DELIMITER = '/', ':'
   to_slash = function(path) return path end
