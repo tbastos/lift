@@ -55,6 +55,12 @@ describe('lift.string', function()
     assert.equal('/[a-zA-Z]/file_[?]%.cool', str.from_glob('/[a-zA-Z]/file_[?].cool'))
   end)
 
+  it('offers split() to iterate substrings in a list', function()
+    local t = {}
+    for p in str.split'one;two,three' do t[#t + 1] = p end
+    assert.same({'one', 'two', 'three'}, t)
+  end)
+
   it('offers expand() to interpolate ${vars} in strings', function()
     local xp = str.expand
     assert.equal('Hello, world!', xp('${1}, ${2}!', {'Hello', 'world'}))
@@ -68,62 +74,4 @@ describe('lift.string', function()
     assert.equal('2,3,4', xp('${1},${2},${3}', nil, function(t, v) return v+1 end))
   end)
 
-  it("offers format_value()", function()
-    assert.equal('3', str.format_value(3))
-    assert.equal('true', str.format_value(true))
-    assert.equal('"str"', str.format_value('str'))
-    assert.match('table', str.format_value({}))
-  end)
-
-  it("offers format_key()", function()
-    assert.equal('[3]', str.format_key(3))
-    assert.equal('[true]', str.format_key(true))
-    assert.equal('str', str.format_key('str'))
-    assert.equal('["nasty\\\nstr"]', str.format_key('nasty\nstr'))
-  end)
-
-  it("offers format_flat_list()", function()
-    assert.equal('3, 2, 1, true', str.format_flat_list{3, 2, 1, true})
-    assert.Nil(str.format_flat_list({'tooooo loooooong'}, 10))
-    assert.Nil(str.format_flat_list{1, {}})
-  end)
-
-  it("offers format_flat_table()", function()
-    assert.equal('"a1", "a2", x = 1, y = 2, [true] = 3',
-      str.format_flat_table{'a1', 'a2', x = 1, [true] = 3, y = 2})
-    assert.Nil(str.format_flat_table({x = 'tooooo loooooong'}, 10))
-    assert.Nil(str.format_flat_table{1, {}})
-  end)
-
-  it("offers format_table() and format()", function()
-    local t = {true, [3]=3, ['2']=2, [4]=4, nested = {x = 1, y = 2, z = 3}}
-    local expected = [[{
-  [1] = true,
-  [3] = 3,
-  [4] = 4,
-  ["2"] = 2,
-  nested = {x = 1, y = 2, z = 3},
-}]]
-    assert.equal(expected, str.format_table(t))
-    assert.equal(expected, str.format(t))
-
-    -- create cycles
-    t.to_root = t
-    t.nested.to_nested = t.nested
-    setmetatable(t, {__tostring = function() return 'metamethod' end})
-    assert.equal([[{
-  [1] = true,
-  [3] = 3,
-  [4] = 4,
-  ["2"] = 2,
-  nested = {
-    to_nested = @.nested,
-    x = 1,
-    y = 2,
-    z = 3,
-  },
-  to_root = @,
-}]], str.format_table(t))
-    assert.equal('metamethod', str.format(t))
-  end)
 end)

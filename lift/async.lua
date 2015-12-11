@@ -9,7 +9,7 @@ local co_yield = coroutine.yield
 local co_running = coroutine.running
 local dbg_getinfo = debug.getinfo
 
-local to_slash = require('lift.path').to_slash
+local to_slash = require'lift.path'.to_slash
 local diagnostics = require 'lift.diagnostics'
 local pcall = diagnostics.pcall
 
@@ -22,14 +22,14 @@ local UV_RUN_ONCE = uv.RUN_ONCE
 ------------------------------------------------------------------------------
 
 local coroutines = {} -- list of free coroutines + map{co = future}
-local execute -- called to execute a future
-local on_done -- called with the results of pcall(execute(future))
+local on_begin  -- called to execute a future
+local on_end    -- called with the results of pcall(on_begin(future))
 
--- Reusable coroutine function. Calls execute(future) in cycles.
+-- Reusable coroutine function. Calls on_begin/on_end in cycles.
 local function thread_f(future)
   while true do
-    local ok, res = pcall(execute, future)
-    on_done(future, ok, res)
+    local ok, res = pcall(on_begin, future)
+    on_end(future, ok, res)
     future = co_yield(res)
   end
 end
@@ -108,7 +108,7 @@ end
 
 function Future:__tostring()
   local info, arg = dbg_getinfo(self.f, 'S'), self.arg
-  local file = to_slash(info.short_src)
+  local file = to_slash(info.short_src) -- normalize paths
   return 'async(function<'..file..':'..info.linedefined..'>'..
     (arg and ', ' or '')..(arg and tostring(arg) or '')..')'
 end
@@ -133,14 +133,14 @@ function Future:check_error()
   if err then error(err) end
 end
 
--- Called by coroutines to execute a future.
-execute = diagnostics.trace('[thread] ${future} started',
+-- Called by coroutines to execute a new future.
+on_begin = diagnostics.trace('[thread] ${future} started',
   function(future)
     return {future.f(future.arg)}
   end)
 
 -- Called by coroutines when a future completes execution.
-on_done = diagnostics.trace('[thread] ${future} ended with ${ok} ${res}',
+on_end = diagnostics.trace('[thread] ${future} ended with ${ok} ${res}',
   function(future, ok, res)
     local error_checked = true
     local cb_err, cb_res -- callback arguments

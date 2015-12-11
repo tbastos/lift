@@ -1,9 +1,7 @@
 local task = require 'lift.task'
-local utils = require 'lift.utils'
-local lstring = require 'lift.string'
-local ESC = require('lift.color').ESC
-
-local write = io.write
+local util = require 'lift.util'
+local write, inspect = io.write, util.inspect
+local ESC = require'lift.color'.ESC
 local app = ...
 
 local task_cmd = app:command 'task'
@@ -35,11 +33,11 @@ function call_cmd:run()
   args[0] = nil
   args.used = nil -- don't complain about unused args
   table.remove(args, 1)
-  write(ESC'green', 'Calling ', tostring(callee), lstring.format(args),
+  write(ESC'green', 'Calling ', tostring(callee), inspect(args),
     ESC'clear', '\n')
   callee(args)
   local res = callee:get_result_for(args)
-  write(ESC'green', 'Task results = ', lstring.format(res), ESC'clear')
+  write(ESC'green', 'Task results = ', inspect(res), ESC'clear')
 end
 
 -- task list
@@ -48,7 +46,7 @@ local list_cmd = task_cmd:command 'list'
 
 local function list_namespace(ns, pattern)
   local tasks, count = ns.tasks, 0
-  for i, name in ipairs(utils.keys_sorted(tasks)) do
+  for i, name in ipairs(util.keys_sorted(tasks)) do
     local full_name = tostring(tasks[name])
     if full_name:find(pattern) then -- filter by pattern
       count = count + 1
@@ -57,7 +55,7 @@ local function list_namespace(ns, pattern)
     end
   end
   local nested = ns.nested
-  for i, name in ipairs(utils.keys_sorted(nested)) do
+  for i, name in ipairs(util.keys_sorted(nested)) do
     count = count + list_namespace(nested[name], pattern)
   end
   return count

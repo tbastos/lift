@@ -4,7 +4,7 @@
 
 local config = require 'lift.config'
 local diagnostics = require 'lift.diagnostics'
-local to_bool = require('lift.string').to_bool
+local to_bool = require'lift.string'.to_bool
 
 local assert, ipairs, pairs, type = assert, ipairs, pairs, type
 local unpack = table.unpack or unpack -- LuaJIT compatibility

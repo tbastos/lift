@@ -8,6 +8,7 @@ local ssub = string.sub
 local sfind = string.find
 local tconcat = table.concat
 
+local fs = require 'lift.fs'
 local path = require 'lift.path'
 
 ------------------------------------------------------------------------------
@@ -131,7 +132,7 @@ local function resolve(rel_name, abs_name)
   if abs_name then -- if abs_name is given we never search ${load_path}
     return path.clean(path.dir(abs_name) .. '/' .. rel_name)
   end
-  local filename = path.glob('${load_path}/'..rel_name)()
+  local filename = fs.glob('${load_path}/'..rel_name)()
   if not filename then
     error("cannot find template '"..rel_name.."'", 3)
   end

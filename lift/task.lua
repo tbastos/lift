@@ -9,7 +9,7 @@ local str_find, str_gmatch, str_match = string.find, string.gmatch, string.match
 local tbl_concat, tbl_sort = table.concat, table.sort
 local dbg_getlocal = debug.getlocal
 
-local lstr_format = require('lift.string').format
+local inspect = require'lift.util'.inspect
 local diagnostics = require 'lift.diagnostics'
 
 local async = require 'lift.async'
@@ -100,14 +100,14 @@ end
 
 local function validate_name(name)
   if type(name) ~= 'string' or str_find(name, '^%a[_%w]*$') == nil then
-    error('expected a task name, got '..lstr_format(name), 4)
+    error('expected a task name, got '..inspect(name), 4)
   end
 end
 
 local function new_task(ns, name, f)
   validate_name(name)
   if type(f) ~= 'function' then
-    error('expected a function, got '..lstr_format(f), 3)
+    error('expected a function, got '..inspect(f), 3)
   end
   local param = dbg_getlocal(f, 1)
   if param == 'self' then

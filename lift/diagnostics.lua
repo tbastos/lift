@@ -19,10 +19,12 @@ local str_rep, str_sub = string.rep, string.sub
 local dbg_getinfo, dbg_getlocal = debug.getinfo, debug.getlocal
 local dbg_traceback = debug.traceback
 
-local to_slash = require('lift.path').to_slash
+local to_slash = require'lift.path'.to_slash
 
 local ls = require 'lift.string'
-local ls_expand, ls_format, ls_capitalize = ls.expand, ls.format, ls.capitalize
+local ls_expand, ls_capitalize = ls.expand, ls.capitalize
+
+local inspect = require'lift.util'.inspect
 
 local color = require 'lift.color'
 local ESC = color.ESC
@@ -99,16 +101,16 @@ local function new(t, ...)
   return setmetatable(t, Diagnostic)
 end
 
--- tostring(diagnostic) == diagnostic:format()
-function Diagnostic:__tostring() return self:format() end
+-- tostring(diagnostic) == diagnostic:inspect() (allows polymorphism)
+function Diagnostic:__tostring() return self:inspect() end
 
 -- Returns a concise string representation of the diagnostic.
-local function format_diagnostic(d)
+local function inspect_diagnostic(d)
   local loc, str = d.location, ''
   if loc then str = loc.file..':'..loc.line..': ' end
   return str..d.kind..': '..d.message
 end
-Diagnostic.format = format_diagnostic
+Diagnostic.inspect = inspect_diagnostic
 
 -- report to a diagnostic consumer and keep track of the last error
 local consumer, last_error
@@ -185,10 +187,10 @@ end
 -- Nested Diagnostics (aggregates multiple diagnostic objects into one)
 ------------------------------------------------------------------------------
 
-local function format_nested(d)
-  local s, nested = format_diagnostic(d), d.nested
+local function inspect_nested(d)
+  local s, nested = inspect_diagnostic(d), d.nested
   for i = 1, #nested do
-    s = s..'\n  ('..i..') '..format_diagnostic(nested[i])
+    s = s..'\n  ('..i..') '..inspect_diagnostic(nested[i])
   end
   return s
 end
@@ -197,7 +199,7 @@ end
 local function aggregate(message, elements)
   local n = #elements
   return new{message, nested = elements, n = n, s = (n > 1 and 's' or ''),
-    format = format_nested}
+    inspect = inspect_nested}
 end
 
 ------------------------------------------------------------------------------
@@ -326,7 +328,7 @@ end
 local nil_arg = setmetatable({}, {__tostring = function() return '<nil>' end})
 local function expand_arg(t, name)
   local v = t[name]
-  return v and ls_format(v, 60)
+  return v and inspect(v, 60)
 end
 local function expand_trace(msg, args)
   return ls_expand(msg, args, expand_arg)
@@ -385,9 +387,9 @@ styles.lua_error = {prefix = 'Lua error:', fg = 'red'}
 local function to_diagnostic(err, level)
   if is_a(err) then return err end
   local d = new("lua_error: ${1}", err):set_location(level):traceback(level)
-  if type(err) == 'string' then -- try to remove file:line: from the string
+  if type(err) == 'string' then -- try to erase 'file/path:ln: ' from err
     local file, line, e = str_match(err, '^(..[^:]+):([^:]+): ()')
-    file = file and to_slash(file)
+    file = file and to_slash(file) -- normalize paths
     local loc = d.location
     if file == loc.file and tonumber(line) == loc.line then
       d[1] = str_sub(err, e) -- remove redundant information
@@ -474,19 +476,6 @@ local function capture(f)
 end
 
 ------------------------------------------------------------------------------
--- Utility functions to help debug programs
-------------------------------------------------------------------------------
-
--- Pretty prints a value to stdout.
-local function pp(value, label)
-  if label then
-    io.write(label, ' = ', ls_format(value), '\n')
-  else
-    io.write(ls_format(value), '\n')
-  end
-end
-
-------------------------------------------------------------------------------
 -- Module Table
 ------------------------------------------------------------------------------
 
@@ -498,7 +487,6 @@ return {
   levels = levels,
   new = new,
   pcall = pcall,
-  pp = pp,
   report = report, Reporter = Reporter,
   set_consumer = set_consumer,
   set_stderr = set_stderr,

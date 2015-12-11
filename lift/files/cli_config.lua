@@ -4,16 +4,16 @@
 
 local path = require 'lift.path'
 local config = require 'lift.config'
-local lstring = require 'lift.string'
 local diagnostics = require 'lift.diagnostics'
-local ESC = require('lift.color').ESC
+local inspect = require'lift.util'.inspect
+local ESC = require'lift.color'.ESC
 local str_find = string.find
 
 local function config_get(command)
   local key = command:consume('key')
   local value = config[key]
   if type(value) ~= 'string' then
-    value = lstring.format(value)
+    value = inspect(value)
   end
   io.write(value)
 end
@@ -36,7 +36,7 @@ local function config_list(command)
     else
       write(ESC'red', tostring(key), ESC'clear',
         ESC'green', ' = ', ESC'clear',
-        ESC'cyan', lstring.format(value), ESC'clear', '\n')
+        ESC'cyan', inspect(value), ESC'clear', '\n')
     end
   end, true)
 end

@@ -8,6 +8,9 @@ local assert, type = assert, type
 local rawget, rawset, getmetatable = rawget, rawset, getmetatable
 local getenv, tinsert = os.getenv, table.insert
 
+local util = require 'lift.util'
+local ls = require 'lift.string'
+
 ------------------------------------------------------------------------------
 -- The immutable root scope (methods, constants, access to env vars)
 ------------------------------------------------------------------------------
@@ -15,12 +18,6 @@ local getenv, tinsert = os.getenv, table.insert
 local env_vars = {} -- helper table to get env vars
 local root = setmetatable({}, {id = 'built-in constants', __index = env_vars})
 local config = {} -- the lift.config scope (a proxy)
-
--- solve mutual dependencies
-package.loaded['lift.config'] = config
-local path = require 'lift.path'
-local utils = require 'lift.utils'
-local lstring = require 'lift.string'
 
 -- enable access to env vars through root
 setmetatable(env_vars, {id = 'environment variables', __index = function(t, k)
@@ -84,13 +81,13 @@ setmetatable(config, configMT)
 -- Gets a var as a boolean.
 function root:get_bool(var_name)
   local v = self[var_name] ; if not v or v == true then return v end
-  if type(v) == 'string' then v = lstring.to_bool(v) else v = true end
+  if type(v) == 'string' then v = ls.to_bool(v) else v = true end
   self[var_name] = v
   return v
 end
 
 -- Gets a var as a list. If the variable is a scalar it will be first converted
--- to a list. Strings are split using path.split_list(), other values are
+-- to a list. Strings are split using lift.string.split(), other values are
 -- simply wrapped in a table.
 function root:get_list(var_name, read_only)
   local v = self[var_name] ; local tp = type(v)
@@ -98,7 +95,7 @@ function root:get_list(var_name, read_only)
   local t = {}
   if tp == 'string' then -- split strings
     local i = 0
-    for s in path.split_list(v) do i = i + 1 ; t[i] = s end
+    for s in ls.split(v) do i = i + 1 ; t[i] = s end
   else -- return {v}
     t[1] = v
   end
@@ -165,7 +162,7 @@ function root:list_vars(callback, include_overridden)
   while true do
     local mt = getmetatable(s)
     if s ~= root then -- skip constants
-      for i, k in ipairs(utils.keys_sorted_by_type(s)) do
+      for i, k in ipairs(util.keys_sorted_by_type(s)) do
         local visited = vars[k]
         if not visited then
           vars[k] = true
@@ -199,12 +196,13 @@ end
 -- Initialization
 ------------------------------------------------------------------------------
 
+local path = require 'lift.path'
+
 -- built-in immutable vars
 config.set_const('APP_ID', 'lift')
 config.set_const('APP_VERSION', '0.1.0')
 config.set_const('LIFT_VERSION', config.APP_VERSION)
-config.set_const('LIFT_SRC_DIR', path.abs(path.dir(path.to_slash(debug.getinfo(1, "S").source:sub(2)))))
-config.set_const('DIR_SEPARATOR', package.config:sub(1, 1))
-config.set_const('IS_WINDOWS', (root.DIR_SEPARATOR == '\\'))
-config.set_const('EXE_NAME', (arg and arg[0]) or '?')
-assert(type(config.EXE_NAME == 'string'))
+config.set_const('LIFT_SRC_DIR',
+  path.abs(path.dir(path.to_slash(debug.getinfo(1, "S").source:sub(2)))))
+
+return config

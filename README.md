@@ -8,10 +8,10 @@ Lift is both a **task automation tool** and a **framework** for writing command-
 
 ## Features
 - Tasks and dependencies are concisely written as Lua functions and can run in parallel.
-- Transparent multitasking based on coroutines and _asynchronous I/O_ (using [libuv]).
-- Diagnostics engine for high-quality error reporting, tracing and testing.
+- Transparent multitasking based on coroutines and _asynchronous I/O_ backed by [libuv].
+- Diagnostics engine for high-quality error reporting, testing and tracing.
 - Composable command-line interfaces based on command hierarchies.
-- Scoped configuration system that gets values from the CLI, environment and Lua files. 
+- Scoped configuration system that gets values from the CLI, environment and Lua files.
 - General-purpose [LPeg]-based parsing and AST manipulation framework.
 - Text templating engine with support for embedded Lua, partials and indentation.
 - Modular, extensible architecture with plugins.
@@ -39,11 +39,11 @@ You may also want to read the [project's philosophy](CONTRIBUTING.md#philosophy)
 
 The following projects have in some way influenced Lift's design:
 
-- Command-line interface: [Go], [npm], [argparse]
+- Command-line interface: [argparse], [Go], [npm]
 - Configuration: [npm], [CMake], [Vim]
 - Diagnostics: [Clang]
-- Path API: [Go's filepath]
 - Task/build system: [Rake]/[Jake], [Gulp]
+- Low-level APIs: [Node.js]
 
 [argparse]: https://github.com/mpeterv/argparse
 [busted]: http://olivinelabs.com/busted
@@ -51,7 +51,6 @@ The following projects have in some way influenced Lift's design:
 [CMake]: http://www.cmake.org/
 [DSL]: http://en.wikipedia.org/wiki/Domain-specific_language
 [Go]: https://golang.org/cmd/go/
-[Go's filepath]: http://golang.org/pkg/path/filepath/
 [Gulp]: http://gulpjs.com/
 [Jake]: http://jakejs.com/
 [libuv]: http://libuv.org/
@@ -59,6 +58,7 @@ The following projects have in some way influenced Lift's design:
 [LPeg]: http://www.inf.puc-rio.br/~roberto/lpeg/
 [Lua]: http://www.lua.org/
 [LuaRocks]: http://www.luarocks.org/
+[Node.js]: https://nodejs.org/api/
 [npm]: https://www.npmjs.org/doc/
 [Rake]: http://en.wikipedia.org/wiki/Rake_(software)
 [Vim]: http://en.wikipedia.org/wiki/Vim_(text_editor)

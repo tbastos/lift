@@ -5,11 +5,12 @@
 local loadfile = loadfile
 local str_find, str_match, str_sub = string.find, string.match, string.sub
 
+local fs = require 'lift.fs'
 local path = require 'lift.path'
 local config = require 'lift.config'
 local diagnostics = require 'lift.diagnostics'
 
-local is_dir, is_file, scan_dir = path.is_dir, path.is_file, path.scan_dir
+local is_dir, is_file, scan_dir = fs.is_dir, fs.is_file, fs.scan_dir
 
 -- Returns an iterator over the Lua files in the ${load_path} that follow
 -- a certain naming convention and match the 'type' and 'subtype' strings.

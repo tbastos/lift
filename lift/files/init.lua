@@ -3,8 +3,10 @@
 ------------------------------------------------------------------------------
 
 local config = ...
+local fs = require 'lift.fs'
 local path = require 'lift.path'
-local lstring = require 'lift.string'
+local ls = require 'lift.string'
+local WINDOWS = require'lift.util'.WINDOWS
 
 -- Current working directory
 if not config.cwd then
@@ -15,7 +17,7 @@ end
 if not config.editor then
   local v = config.EDITOR
   if not v then
-    v = config.IS_WINDOWS and 'notepad' or 'vi'
+    v = WINDOWS and 'notepad' or 'vi'
   end
   config.editor = v
 end
@@ -23,7 +25,7 @@ end
 -- Default project_file_names
 if not config.project_file_names then
   config.project_file_names = {
-    lstring.capitalize(config.APP_ID)..'file.lua',
+    ls.capitalize(config.APP_ID)..'file.lua',
     config.APP_ID..'file.lua',
   }
 end
@@ -42,13 +44,13 @@ end
   repeat
     for i, name in ipairs(config.project_file_names) do
       local file = dir..'/'..name
-      if path.is_file(file) then
+      if fs.is_file(file) then
         config.project_file = file
         config.project_dir = dir
         return
       end
     end
-    if path.is_dir(dir..'/'..config.project_files_dir_name) then
+    if fs.is_dir(dir..'/'..config.project_files_dir_name) then
       config.project_dir = dir
       return
     end
@@ -68,7 +70,7 @@ end
 
 local function set_dir(name, unix_var, unix_default, win_var, win_default)
   if not config[name] then
-    if config.IS_WINDOWS then
+    if WINDOWS then
       config[name] = env(win_var, win_default) ..'/'.. config.APP_ID
     else
       config[name] = env(unix_var, unix_default) ..'/'.. config.APP_ID
@@ -107,7 +109,7 @@ set_dir('cache_dir',
 
 -- Add default entries to load_path
 local function add_path(p)
-  if path.is_dir(p) then
+  if fs.is_dir(p) then
     config:insert_unique('load_path', p)
     return true
   end
