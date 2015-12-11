@@ -1,7 +1,7 @@
 describe("A lift.task", function()
 
+  local su = require 'spec.util'
   local task = require 'lift.task'
-  local async = require 'lift.async'
   local diagnostics = require 'lift.diagnostics'
 
   before_each(function()
@@ -84,16 +84,11 @@ describe("A lift.task", function()
 
   end)
 
-  -- helper to run tests that start async threads
-  local function _async(f)
-    return function() async(f) async.run() end
-  end
-
   describe("task", function()
-    it("can be called as a function with one arg", _async(function()
+    it("can be called as a function with one arg", su.async(function()
       local v = 0
-      function task:add_two() v = v + 2 end
-      function task:add_arg(arg) v = v + arg end
+      function task.add_two() v = v + 2 end
+      function task.add_arg(arg) v = v + arg end
       task.add_two()
       assert.equal(2, v)
       task.add_two()
@@ -111,9 +106,9 @@ describe("A lift.task", function()
         "tasks can only take one argument")
     end))
 
-    it("can return multiple values", _async(function()
-      function task:nums() return 1, 2, 3 end
-      function task:args(a) return a[1], a[2], a[3] end
+    it("can return multiple values", su.async(function()
+      function task.nums() return 1, 2, 3 end
+      function task.args(a) return a[1], a[2], a[3] end
       local r1, r2, r3, r4 = task.nums()
       assert.equal(1, r1)
       assert.equal(2, r2)
@@ -143,11 +138,11 @@ describe("A lift.task", function()
       assert.equal('task list {sub.t3, t1, t2}', tostring(task{task.t2, task.t1, sub.t3}))
     end)
 
-    it("can be invoked like a task", _async(function()
+    it("can be invoked like a task", su.async(function()
       local v = 0
-      function task:add_two() v = v + 2 end
-      function task:add_five() v = v + 5 end
-      function task:add_arg(arg) print('self:', self) v = v + arg end
+      function task.add_two() v = v + 2 end
+      function task.add_five() v = v + 5 end
+      function task.add_arg(arg) v = v + arg end
       task{task.add_two, task.add_five, task.add_arg}(3)
       assert.equal(10, v)
       task{task.add_two, task.add_five}()
@@ -155,11 +150,9 @@ describe("A lift.task", function()
       task{task.add_two, task.add_five}()
       assert.equal(17, v)
       task.add_arg(3)
-      print('v1:', v)
       assert.equal(17, v)
       task.add_arg(4)
       assert.equal(21, v)
-      print('v:', v)
     end))
 
   end)

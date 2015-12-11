@@ -18,8 +18,9 @@ local ls = require 'lift.string'
 local from_glob, split_string = ls.from_glob, ls.split
 
 local uv = require 'lluv'
-local uv_chdir, uv_mkdir, uv_rmdir = uv.chdir, uv.fs_mkdir, uv.fs_rmdir
-local uv_cwd, uv_stat, uv_scandir = uv.cwd, uv.fs_stat, uv.fs_scandir
+local uv_chdir, uv_cwd = uv.chdir, uv.cwd
+local uv_mkdir, uv_rmdir = uv.fs_mkdir, uv.fs_rmdir
+local uv_stat, uv_scandir = uv.fs_stat, uv.fs_scandir
 
 ------------------------------------------------------------------------------
 -- Basic libuv wrappers
@@ -30,7 +31,7 @@ local function chdir(path) return uv_chdir(from_slash(path)) end
 local function stat(path) return uv_stat(from_slash(path)) end
 local function mkdir(path) return uv_mkdir(from_slash(path), 493) end -- 493 = 0755
 local function rmdir(path) return uv_rmdir(from_slash(path)) end
-local function scan_dir(path) return uv_scandir(from_slash(path)) end
+local function read_dir(path) return uv_scandir(from_slash(path)) end
 
 ------------------------------------------------------------------------------
 -- Extra Functions
@@ -154,9 +155,9 @@ local function match(path, glob, vars, get_var)
   return glob_product(pt, match_alternative, path) or false
 end
 
--- metatable to memoize scan_dir()
+-- metatable to memoize read_dir()
 local DirEntries = {__index = function(t, path)
-  local res = scan_dir(path) or false
+  local res = read_dir(path) or false
   t[path] = res
   return res
 end}
@@ -243,5 +244,5 @@ return {
   mkdir = mkdir,
   mkdir_all = mkdir_all,
   rmdir = rmdir,
-  scan_dir = scan_dir,
+  read_dir = read_dir,
 }

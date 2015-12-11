@@ -6,7 +6,7 @@ local tbl_concat = table.concat
 local str_gmatch, str_match = string.gmatch, string.match
 local str_gsub, str_lower, str_sub = string.gsub, string.lower, string.sub
 
-local WINDOWS = require'lift.util'.WINDOWS
+local WINDOWS = require'lift.util'._WINDOWS
 
 ------------------------------------------------------------------------------
 -- OS abstraction
@@ -19,7 +19,7 @@ local DELIMITER   -- Platform-specific path delimiter (':' or ';')
 
 if WINDOWS then
   SEP, DELIMITER = '\\', ';'
-  to_slash = function(path) return (str_lower(str_gsub(path, SEP, '/'))) end
+  to_slash = function(path) return str_lower((str_gsub(path, SEP, '/'))) end
   from_slash = function(path) return (str_gsub(path, '/', SEP)) end
 else
   SEP, DELIMITER = '/', ':'

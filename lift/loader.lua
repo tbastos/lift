@@ -10,7 +10,7 @@ local path = require 'lift.path'
 local config = require 'lift.config'
 local diagnostics = require 'lift.diagnostics'
 
-local is_dir, is_file, scan_dir = fs.is_dir, fs.is_file, fs.scan_dir
+local is_dir, is_file, read_dir = fs.is_dir, fs.is_file, fs.read_dir
 
 -- Returns an iterator over the Lua files in the ${load_path} that follow
 -- a certain naming convention and match the 'type' and 'subtype' strings.
@@ -34,7 +34,7 @@ local function find_scripts(type, subtype, reverse_order)
 
     ::ITERATE_LOAD_PATH:: dir = load_path[i] ; i = i + si
     if not dir then return nil end
-    dir_i, dir_names = 1, scan_dir(dir)
+    dir_i, dir_names = 1, read_dir(dir)
     if not dir_names then error("invalid ${load_path} dir '"..dir.."'") end
 
     ::ITERATE_DIR:: _name = dir_names[dir_i] ; dir_i = dir_i + 1
@@ -42,7 +42,7 @@ local function find_scripts(type, subtype, reverse_order)
       if _name == type then
         _name = dir..'/'.._name
         if is_dir(_name) then
-          subdir, sub_i, sub_names = _name, 1, scan_dir(_name)
+          subdir, sub_i, sub_names = _name, 1, read_dir(_name)
           goto ITERATE_SUBDIR
         end
       else

@@ -188,8 +188,8 @@ end
 ------------------------------------------------------------------------------
 
 return {
-  UNIX = UNIX,
-  WINDOWS = WINDOWS,
+  _UNIX = UNIX,         -- for internal use; prefer os.UNIX/WINDOWS
+  _WINDOWS = WINDOWS,   -- (solves circular dependency)
   inspect = inspect,
   inspect_flat_list = inspect_flat_list,
   inspect_flat_table = inspect_flat_table,

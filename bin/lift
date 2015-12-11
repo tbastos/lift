@@ -10,15 +10,15 @@ local diagnostics = require 'lift.diagnostics'
 -- enable colors by default on supported terminals
 require'lift.color'.set_enabled(os.getenv('TERM') or os.getenv('ANSICON'))
 
+-- add files specific to this executable to the ${load_path}
+config.set_const('APP_LOAD_PATH', config.LIFT_SRC_DIR..'/files/lift')
+
 os.exit(diagnostics.wrap(function()
 
   -- parse key=value configs at the beginning of arg list
   local cli_scope = config:new_parent('cli')
   cli.parse_config(arg)
   diagnostics.set_tracing(config:get_bool('tracing'))
-
-  -- add 'lift executable'-specific files to the ${load_path}
-  config:insert_unique('load_path', config.LIFT_SRC_DIR..'/files/lift')
 
   -- run init scripts
   local top_scope = loader.init()

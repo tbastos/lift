@@ -29,6 +29,7 @@ build = {
     ["lift.diagnostics"] = "lift/diagnostics.lua",
     ["lift.fs"] = "lift/fs.lua",
     ["lift.loader"] = "lift/loader.lua",
+    ["lift.os"] = "lift/os.lua",
     ["lift.path"] = "lift/path.lua",
     ["lift.string"] = "lift/string.lua",
     ["lift.task"] = "lift/task.lua",

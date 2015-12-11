@@ -74,7 +74,7 @@ end
 -- Split string
 ------------------------------------------------------------------------------
 
-local DELIMITERS = (require'lift.util'.UNIX and ';:,' or ';,')
+local DELIMITERS = (require'lift.util'._UNIX and ';:,' or ';,')
 local LIST_ELEM_PATT = '([^'..DELIMITERS..']+)['..DELIMITERS..']*'
 
 -- Splits a string on ';' or ',' (or ':' on UNIX).

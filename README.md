@@ -39,11 +39,10 @@ You may also want to read the [project's philosophy](CONTRIBUTING.md#philosophy)
 
 The following projects have in some way influenced Lift's design:
 
-- Command-line interface: [argparse], [Go], [npm]
+- Command-line interface: [Go], [argparse], [npm]
 - Configuration: [npm], [CMake], [Vim]
 - Diagnostics: [Clang]
 - Task/build system: [Rake]/[Jake], [Gulp]
-- Low-level APIs: [Node.js]
 
 [argparse]: https://github.com/mpeterv/argparse
 [busted]: http://olivinelabs.com/busted
@@ -58,7 +57,6 @@ The following projects have in some way influenced Lift's design:
 [LPeg]: http://www.inf.puc-rio.br/~roberto/lpeg/
 [Lua]: http://www.lua.org/
 [LuaRocks]: http://www.luarocks.org/
-[Node.js]: https://nodejs.org/api/
 [npm]: https://www.npmjs.org/doc/
 [Rake]: http://en.wikipedia.org/wiki/Rake_(software)
 [Vim]: http://en.wikipedia.org/wiki/Vim_(text_editor)

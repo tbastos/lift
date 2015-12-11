@@ -6,16 +6,20 @@ local config = ...
 local fs = require 'lift.fs'
 local path = require 'lift.path'
 local ls = require 'lift.string'
-local WINDOWS = require'lift.util'.WINDOWS
+local WINDOWS = require'lift.util'._WINDOWS
 
 -- Default editor
 if not config.editor then
-  local v = config.EDITOR
+  local v = os.getenv'EDITOR'
   if not v then
     v = WINDOWS and 'notepad' or 'vi'
   end
   config.editor = v
 end
+
+------------------------------------------------------------------------------
+-- Detect project_file and project_dir
+------------------------------------------------------------------------------
 
 -- Default project_file_names
 if not config.project_file_names then
@@ -25,14 +29,10 @@ if not config.project_file_names then
   }
 end
 
--- Default project_files_dir
-if not config.project_files_dir then
-  config.project_files_dir = '.'..config.APP_ID
+-- Default project_dir_name
+if not config.project_dir_name then
+  config.project_dir_name = '.'..config.APP_ID
 end
-
-------------------------------------------------------------------------------
--- Detect project_file and project_dir
-------------------------------------------------------------------------------
 
 (function()
   local dir = fs.cwd()
@@ -45,7 +45,7 @@ end
         return
       end
     end
-    if fs.is_dir(dir..'/'..config.project_files_dir) then
+    if fs.is_dir(dir..'/'..config.project_dir_name) then
       config.project_dir = dir
       return
     end
@@ -53,6 +53,7 @@ end
   until #dir <= 1 or path.is_root(dir)
 end)()
 
+-- change cwd to project_dir
 if config.project_dir then
   fs.chdir(config.project_dir)
 end
@@ -106,7 +107,6 @@ set_dir('cache_dir',
 -- Default load_path
 ------------------------------------------------------------------------------
 
--- Add default entries to load_path
 local function add_path(p)
   if fs.is_dir(p) then
     config:insert_unique('load_path', p)
@@ -121,11 +121,18 @@ if config.LOAD_PATH then
   end
 end
 
--- project-specific files
+-- add project-specific dir
 if config.project_dir then
-  add_path(config.project_dir..'/'..config.project_files_dir)
+  add_path(config.project_dir..'/'..config.project_dir_name)
 end
 
--- user and system-specific files
+-- add user and system-specific dirs
 add_path(config.user_config_dir)
 add_path(config.system_config_dir)
+
+-- add app-specific dirs specified via APP_LOAD_PATH
+if config.APP_LOAD_PATH then
+  for i, dir in ipairs(config:get_list('APP_LOAD_PATH', true)) do
+    add_path(dir)
+  end
+end

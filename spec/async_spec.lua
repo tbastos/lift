@@ -162,7 +162,7 @@ expose("lift.async", function()
             count = count + 1
           end
         end
-        async.stop()
+        async.abort()
         return first, count
       end
       local future = async(wait_first)

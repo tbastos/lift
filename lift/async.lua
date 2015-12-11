@@ -5,8 +5,8 @@
 local assert, next, setmetatable = assert, next, setmetatable
 local co_create = coroutine.create
 local co_resume = coroutine.resume
-local co_yield = coroutine.yield
 local co_running = coroutine.running
+local co_yield = coroutine.yield
 local dbg_getinfo = debug.getinfo
 
 local to_slash = require'lift.path'.to_slash
@@ -48,9 +48,9 @@ local function co_alloc(future)
 end
 
 -- Deallocates a coroutine currently allocated to a future.
-local function co_free(co, future)
+local function co_free(co)
   coroutines[#coroutines+1] = co
-  coroutines[future] = nil
+  coroutines[co] = nil
 end
 
 -- Returns the currently running future and coroutine.
@@ -128,6 +128,7 @@ function Future:on_ready(callback)
   end
 end
 
+-- Checks whether the future has an error, and if so raises the error.
 function Future:check_error()
   local err = self.error
   if err then error(err) end
@@ -165,7 +166,7 @@ on_end = diagnostics.trace('[thread] ${future} ended with ${ok} ${res}',
       unchecked_errors[future] = res
     end
     -- only reuse coroutine if no errors are raised by callbacks
-    co_free(future.co, future)
+    co_free(future.co)
   end)
 
 ------------------------------------------------------------------------------
@@ -201,9 +202,9 @@ local function run()
   step() -- handles final events
 end
 
--- Forces run() to stop while there are still threads waiting for events.
+-- Forces run() to exit while there are still threads waiting for events.
 -- May cause leaks and bugs. Only call if you want to terminate the application.
-local function stop()
+local function abort()
   uv.handles(function(handle) handle:close() end)
 end
 
@@ -321,15 +322,20 @@ local function sleep(dt)
 end
 
 ------------------------------------------------------------------------------
--- Module Table
+-- Module Table/Functor
 ------------------------------------------------------------------------------
 
 return setmetatable({
+  -- Private API for modules implementing low-level async code
+  _get = co_get,
+  _resume = resume_soon,
+  -- Public API
+  abort = abort,
   async = async,
   check_errors = check_errors,
   run = run,
+  running = co_get,
   sleep = sleep,
-  stop = stop,
   wait = wait,
   wait_all = wait_all,
   wait_any = wait_any,
