@@ -75,14 +75,10 @@ local load_file = diagnostics.trace('[loader] loading ${filename}',
     if chunk then
       chunk(...)
     else
-      local file, line, e = str_match(err, '^(..[^:]+):([^:]+): ()')
-      file = file and path.to_slash(file)
-      if file ~= filename then
-        error('unexpected error format: '..err)
-      end
+      local line, e = str_match(err, '^..[^:]+:([^:]+): ()')
       local msg = str_sub(err, e)
       diagnostics.new{'lua_syntax_error: ', message = msg,
-        location = {file = file, line = tonumber(line)}}:report()
+        location = {file = filename, line = tonumber(line)}}:report()
     end
   end)
 
