@@ -1,6 +1,12 @@
 language: c
-
 sudo: false
+
+addons:
+  apt:
+    sources:
+      - kalakris-cmake
+    packages:
+      - cmake
 
 env:
   global:
@@ -22,6 +28,7 @@ before_install:
 before_script:
   - luarocks install lpeg
   - luarocks install lluv UV_DIR=$TRAVIS_BUILD_DIR/libuv UV_LIBDIR=$TRAVIS_BUILD_DIR/libuv/.libs
+  - luarocks install luv
   - luarocks install busted
   - luarocks install luacov
   - luarocks install luacov-coveralls

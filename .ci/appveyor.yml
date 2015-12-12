@@ -42,6 +42,7 @@ install:
 build_script:
   - luarocks install lpeg
   - luarocks install lluv "UV_DIR=%LIBUV%" "UV_LIBDIR=%LIBUV%"
+  - luarocks install luv
   - luarocks install busted
   - busted -v
   - luarocks make rocks/lift-scm-0.rockspec
