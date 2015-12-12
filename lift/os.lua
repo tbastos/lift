@@ -27,6 +27,12 @@ diagnostics.levels.child_process_error = 'fatal'
 diagnostics.styles.child_process_error =
   {prefix = 'error in child process:', fg = 'red'}
 
+-- given a list of strings read from a stream, return a whole string
+local function from_text_stream(buffer)
+  local str = tbl_concat(buffer)
+  return UNIX and str or str:gsub('\r\n', '\n') -- normalize newlines
+end
+
 ------------------------------------------------------------------------------
 -- Spawn a child process
 ------------------------------------------------------------------------------
@@ -70,7 +76,7 @@ local function sh(command)
     stderr[#stderr+1] = data
   end)
   co_yield()
-  stdout, stderr = tbl_concat(stdout), tbl_concat(stderr)
+  stdout, stderr = from_text_stream(stdout), from_text_stream(stderr)
   if exit_err then
     return nil, diagnostics.new(
       "child_process_error: spawn failed with error '${1}'", exit_err)

@@ -14,7 +14,7 @@ describe('lift.os', function()
 
     out, err = os.sh'invalid_cmd error'
     assert.Nil(out)
-    assert.match('command not found', err)
+    assert.match('command failed .* not found', err)
   end))
 
 end)
