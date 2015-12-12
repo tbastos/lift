@@ -24,15 +24,10 @@ describe('lift.fs', function()
     local t = {}
     for name, et in fs.scandir('spec/files/templates') do
       if not name:find('^%.') then
-        t[#t+1] = {name, et}
+        t[#t+1] = name
       end
     end
-    assert.same({
-        {'file.lua', 'file'},
-        {'row.lua', 'file'},
-        {'sub', 'directory'},
-        {'table.lua', 'file'},
-      }, t)
+    assert.same({'file.lua', 'row.lua', 'sub', 'table.lua'}, t)
   end)
 
   describe('file globbing', function()

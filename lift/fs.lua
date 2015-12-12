@@ -37,7 +37,6 @@ local function stat(path) return uv_stat(from_slash(path)) end
 local function _scandir_next(dir_req)
   local t = uv_scandir_next(dir_req) -- FIXME shouldn't use tables here
   if not t then return end
-  require'lift.util'.print(t)
   return t.name, t.type
 end
 local function scandir(path) return _scandir_next, uv_scandir(from_slash(path)) end
@@ -168,6 +167,7 @@ end
 local function glob_starstar(f, path, ...)
   f(path, ...)
   for name, et in scandir(path) do
+    if not et then et = stat(path..'/'..name).type end
     if et == 'directory' and not str_find(name, '^%.') then -- ignore dotdirs
       local subdir = path..'/'..name
       glob_starstar(f, subdir, ...)
