@@ -13,9 +13,9 @@ local to_slash = require'lift.path'.to_slash
 local diagnostics = require 'lift.diagnostics'
 local pcall = diagnostics.pcall
 
-local uv = require 'lluv'
-local uv_run, uv_timer, uv_now = uv.run, uv.timer, uv.now
-local UV_RUN_ONCE = uv.RUN_ONCE
+local uv = require 'luv'
+local uv_run, uv_now, uv_close = uv.run, uv.now, uv.close
+local uv_new_timer, uv_timer_start = uv.new_timer, uv.timer_start
 
 ------------------------------------------------------------------------------
 -- Coroutine (thread) Pool
@@ -198,14 +198,14 @@ end
 
 -- Runs all async functions to completion. Call this from the main thread.
 local function run()
-  repeat step() until uv_run(UV_RUN_ONCE) == 0
+  repeat step() until not uv_run('once')
   step() -- handles final events
 end
 
 -- Forces run() to exit while there are still threads waiting for events.
 -- May cause leaks and bugs. Only call if you want to terminate the application.
 local function abort()
-  uv.handles(function(handle) handle:close() end)
+  uv.walk(function(h) if not h:is_closing() then h:close() end end)
 end
 
 -- Suspends the calling thread until `future` becomes ready, or until `timeout`
@@ -221,35 +221,35 @@ local function wait(future, timeout)
   end
   local this_future = co_get()
   if future == this_future then error('future cannot wait for itself', 2) end
-  local results, err
+  local err, res
   if timeout then
-    local timer = uv_timer()
-    local function callback(future_or_timer, e, res)
-      if timer == nil then return end -- ignore second call
-      if future_or_timer == timer then res = 'timed out' end
-      err = e
-      resume_soon(this_future, res)
-      timer:close()
+    local timer = uv_new_timer()
+    local function callback(_future, _err, _res)
+      if timer == nil then return false end -- ignore second call
+      if _future then err, res = _err, _res
+      else res = 'timed out' end
+      resume_soon(this_future)
+      uv_close(timer)
       timer = nil
       return true
     end
-    timer:start(timeout, callback)
+    uv_timer_start(timer, timeout, 0, callback)
     future:on_ready(callback)
-    results = co_yield()
-    if results == 'timed out' then return false, results end
+    co_yield()
+    if res == 'timed out' then return false, res end
   else
-    future:on_ready(function(_, e, res)
-      err = e
-      resume_soon(this_future, res)
+    future:on_ready(function(_, _err, _res)
+      err, res = _err, _res
+      resume_soon(this_future)
       return true
     end)
-    results = co_yield()
+    co_yield()
   end
   if err then
     err.future = future
     return false, err
   end
-  return true, results
+  return true, res
 end
 
 -- Suspends the calling thread until any future from the list becomes ready.
@@ -313,11 +313,13 @@ end
 -- Suspends the calling thread until `dt` milliseconds have passed.
 -- Returns the elapsed time spent sleeping, in milliseconds.
 local function sleep(dt)
-  local timer, this_future = uv_timer(), co_get()
-  timer:start(dt, function() resume_soon(this_future) end)
+  local timer, this_future = uv_new_timer(), co_get()
+  uv_timer_start(timer, dt, 0, function()
+    uv_close(timer)
+    resume_soon(this_future)
+  end)
   local t0 = uv_now()
   co_yield()
-  timer:close()
   return uv_now() - t0
 end
 

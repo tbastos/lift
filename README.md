@@ -19,7 +19,7 @@ Lift is both a **task automation tool** and a **framework** for writing command-
 ### Prerequisites
 - **OS:** Linux, OSX, Windows or another platform supported by [libuv].
 - **Lua:** Lua 5.2, Lua 5.3, LuaJIT 2.0 or LuaJIT 2.1
-- **Libraries:** [LPeg] and [lluv]
+- **Libraries:** [LPeg] and [luv]
 
 ## Installation
 
@@ -53,7 +53,7 @@ The following projects have in some way influenced Lift's design:
 [Gulp]: http://gulpjs.com/
 [Jake]: http://jakejs.com/
 [libuv]: http://libuv.org/
-[lluv]: https://github.com/moteus/lua-lluv
+[luv]: https://github.com/luvit/luv
 [LPeg]: http://www.inf.puc-rio.br/~roberto/lpeg/
 [Lua]: http://www.lua.org/
 [LuaRocks]: http://www.luarocks.org/

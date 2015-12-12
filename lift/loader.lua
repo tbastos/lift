@@ -3,66 +3,32 @@
 ------------------------------------------------------------------------------
 
 local loadfile = loadfile
-local str_find, str_match, str_sub = string.find, string.match, string.sub
+local str_match, str_sub = string.match, string.sub
 
-local fs = require 'lift.fs'
+local glob = require'lift.fs'.glob
 local path = require 'lift.path'
 local config = require 'lift.config'
 local diagnostics = require 'lift.diagnostics'
-
-local is_dir, is_file, read_dir = fs.is_dir, fs.is_file, fs.read_dir
 
 -- Returns an iterator over the Lua files in the ${load_path} that follow
 -- a certain naming convention and match the 'type' and 'subtype' strings.
 -- When subtype is omitted all subtypes are matched.
 --   ./${type}.lua
---   ./${type}_${subtype}.lua
---   ./${type}/${subtype}.lua
---   ./${type}/${subtype}_*.lua
-local function find_scripts(type, subtype, reverse_order)
-  subtype = subtype or '[^_]*'
-  local load_path = config:get_list('load_path')
-  local patt = '^'..type..'(_?)('..subtype..')%.lua$'
-  local subpatt = '^'..subtype..'(_?)(.*)%.lua$'
-  local i, si = (reverse_order and #load_path or 1), reverse_order and -1 or 1
-  local dir, dir_names, dir_i, subdir, sub_names, sub_i
-  return function()
-    -- this code is simpler with goto's
-    local _, _name, _e, _sep, _sub
-    if subdir then goto ITERATE_SUBDIR end
-    if dir then goto ITERATE_DIR end
-
-    ::ITERATE_LOAD_PATH:: dir = load_path[i] ; i = i + si
-    if not dir then return nil end
-    dir_i, dir_names = 1, read_dir(dir)
-    if not dir_names then error("invalid ${load_path} dir '"..dir.."'") end
-
-    ::ITERATE_DIR:: _name = dir_names[dir_i] ; dir_i = dir_i + 1
-      if not _name then goto ITERATE_LOAD_PATH end
-      if _name == type then
-        _name = dir..'/'.._name
-        if is_dir(_name) then
-          subdir, sub_i, sub_names = _name, 1, read_dir(_name)
-          goto ITERATE_SUBDIR
-        end
-      else
-        _, _e, _sep, _sub = str_find(_name, patt)
-        if _e and (_sub == '' or _sep == '_') then
-          _name = dir..'/'.._name
-          if is_file(_name) then return _name end
-        end
-      end
-    goto ITERATE_DIR
-
-    ::ITERATE_SUBDIR:: _name = sub_names[sub_i] ; sub_i = sub_i + 1
-      if not _name then subdir = nil goto ITERATE_DIR end
-      _, _e, _sep, _sub = str_find(_name, subpatt)
-      if _e and (_sub == '' or _sep == '_') then
-        _name = subdir..'/'.._name
-        if is_file(_name) then return _name end
-      end
-    goto ITERATE_SUBDIR
-  end
+--   ./${type}[_/]${subtype}.lua
+--   ./${type}[_/]${subtype}[_/]*.lua
+local separators = {'_', '/'}
+local endings = {'.lua', '_*.lua', '/*.lua'}
+local function find_scripts(type, subtype)
+  local vars = {
+    path = config:get_list'load_path',
+    type = type,
+    sep = separators,
+    subtype = subtype,
+    ending = endings,
+  }
+  local pattern = '${path}/${type}${sep}${subtype}${ending}'
+  if not subtype then pattern = '${path}/${type}${ending}' end
+  return glob(pattern, vars)
 end
 
 -- custom diagnostic for Lua syntax errors
@@ -111,8 +77,12 @@ local init = diagnostics.trace(
     local builtin_files = config.LIFT_SRC_DIR..'/files'
     top_scope = run_init(builtin_files..'/init.lua')
     -- run all init scripts in ${load_path}
-    for script in find_scripts('init', nil, true) do
-      run_init(script)
+    local list = {}
+    for script in find_scripts('init') do
+      list[#list+1] = script
+    end
+    for i = #list, 1, -1 do
+      run_init(list[i])
     end
     -- run ${project_file} if available
     if config.project_file then

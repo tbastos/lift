@@ -23,9 +23,9 @@ describe("lift.loader", function()
     local prev_lp = config.load_path
     config.load_path = 'spec/files/invalid'
     finally(function() config.load_path = prev_lp end)
-    assert.equal(3, count(loader.find_scripts('init')))
+    assert.equal(4, count(loader.find_scripts('init')))
     assert.equal(1, count(loader.find_scripts('initabc')))
-    assert.equal(1, count(loader.find_scripts('init', 'abc')))
+    assert.equal(2, count(loader.find_scripts('init', 'abc')))
     assert.equal(0, count(loader.find_scripts('init', 'none')))
     assert.equal(5, count(loader.find_scripts('foo')))
     assert.equal(3, count(loader.find_scripts('foo', 'bar')))

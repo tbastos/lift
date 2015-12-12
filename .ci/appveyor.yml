@@ -1,6 +1,4 @@
-version: 0.1.{build}
-skip_tags: true
-shallow_clone: true
+configuration: Release
 
 environment:
   LUAROCKS_VER: 2.2.2
@@ -16,9 +14,6 @@ platform:
   - x86
   - x64
 
-configuration:
-  - 2015
-
 matrix:
   fast_finish: true
 
@@ -32,24 +27,16 @@ cache:
 install:
   - call .ci\set_compiler_env.bat
   - call .ci\install.bat
-  - set ARCH=%platform%
-  - set LIBUV_VERSION=1.7.5
-  - appveyor DownloadFile http://dist.libuv.org/dist/v%LIBUV_VERSION%/libuv-%ARCH%-v%LIBUV_VERSION%.build7.exe
-  - libuv-%ARCH%-v%LIBUV_VERSION%.build7.exe /NCRC /S
-  - ps: if ($env:ARCH -eq "x64") {$env:LIBUV="$Env:ProgramFiles\libuv"} else {$env:LIBUV="${env:ProgramFiles(x86)}\libuv"}
-  - set PATH=%PATH%;%LIBUV%
 
 build_script:
   - luarocks install lpeg
-  - luarocks install lluv "UV_DIR=%LIBUV%" "UV_LIBDIR=%LIBUV%"
   - luarocks install luv
   - luarocks install busted
   - busted -v
-  - luarocks make rocks/lift-scm-0.rockspec
+  - luarocks make
   - lift --help
 
 after_build:
   - luarocks remove lift
 
 test: off
-

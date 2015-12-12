@@ -98,7 +98,7 @@ end
 -- `preserve_trailing_slash` is true.
 local function abs(path, from, preserve_trailing_slash)
   if is_abs(path) then return path end
-  if not from then from = to_slash(require'lluv'.cwd()) end
+  if not from then from = to_slash(require'luv'.cwd()) end
   return clean(from..'/'..path, preserve_trailing_slash)
 end
 

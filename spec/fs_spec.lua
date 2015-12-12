@@ -12,12 +12,27 @@ describe('lift.fs', function()
     assert.True(fs.is_file'README.md')
   end)
 
-  it('mkdir_all() to create dirs with missing parents', function()
+  it('offers mkdir_all() to create dirs with missing parents', function()
     assert.no_error(function()
       assert(fs.mkdir_all'sub1/sub2')
       assert(fs.rmdir('sub1/sub2'))
       assert(fs.rmdir('sub1'))
     end)
+  end)
+
+  it('offers scandir() to iterate dir entries', function()
+    local t = {}
+    for name, et in fs.scandir('spec/files/templates') do
+      if not name:find('^%.') then
+        t[#t+1] = {name, et}
+      end
+    end
+    assert.same({
+        {'file.lua', 'file'},
+        {'row.lua', 'file'},
+        {'sub', 'directory'},
+        {'table.lua', 'file'},
+      }, t)
   end)
 
   describe('file globbing', function()

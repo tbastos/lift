@@ -2,12 +2,12 @@ expose("lift.async", function()
 
   local function fa(n) return n end -- keep this at line 3
 
-  local uv = require 'lluv'
+  local uv = require 'luv'
   local async = require 'lift.async'
 
   local TOLERANCE = 20 -- time tolerance for timer callbacks
   if os.getenv('CI') then
-    TOLERANCE = 60 -- increase tolerance in CI build servers
+    TOLERANCE = 50 -- increase tolerance in CI build servers
   end
 
   it("offers run() to run all async functions to completion", function()
@@ -82,10 +82,10 @@ expose("lift.async", function()
       local sleep_30 = async(test_sleep, 30)
       local sleep_90 = async(test_sleep, 90)
       local sleep_60 = async(test_sleep, 60)
-      local t0 = uv.now()
+      local t0 = uv.hrtime()
       async.run()
-      local elapsed = uv.now() - t0
-      assert.near(20, sleep_30.results[1], TOLERANCE)
+      local elapsed = (uv.hrtime() - t0)/1000000 -- from ns to ms
+      assert.near(30, sleep_30.results[1], TOLERANCE)
       assert.near(60, sleep_60.results[1], TOLERANCE)
       assert.near(90, sleep_90.results[1], TOLERANCE)
       assert.near(90, elapsed, TOLERANCE)
@@ -203,9 +203,9 @@ expose("lift.async", function()
         return count
       end
       local future = async(main)
-      local t0 = uv.now()
+      local t0 = uv.hrtime()
       async.run()
-      local elapsed  = uv.now() - t0
+      local elapsed  = (uv.hrtime() - t0)/1000000 -- ns to ms
       assert.equal(n, future.results[1])
       assert.near(n * TOLERANCE, elapsed, TOLERANCE)
       -- add some errors to the mix

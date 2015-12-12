@@ -23,11 +23,9 @@ branches:
 
 before_install:
   - source .ci/setenv_lua.sh
-  - git clone https://github.com/libuv/libuv && cd libuv && sh autogen.sh && ./configure && make && cd ..
 
 before_script:
   - luarocks install lpeg
-  - luarocks install lluv UV_DIR=$TRAVIS_BUILD_DIR/libuv UV_LIBDIR=$TRAVIS_BUILD_DIR/libuv/.libs
   - luarocks install luv
   - luarocks install busted
   - luarocks install luacov
@@ -35,7 +33,7 @@ before_script:
 
 script:
   - busted -c -v
-  - luarocks make rocks/lift-scm-0.rockspec
+  - luarocks make
   - lift --help
 
 after_success:
