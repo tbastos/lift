@@ -37,6 +37,7 @@ local function stat(path) return uv_stat(from_slash(path)) end
 local function _scandir_next(dir_req)
   local t = uv_scandir_next(dir_req) -- FIXME shouldn't use tables here
   if not t then return end
+  require'lift.util'.print(t)
   return t.name, t.type
 end
 local function scandir(path) return _scandir_next, uv_scandir(from_slash(path)) end
