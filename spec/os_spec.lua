@@ -4,11 +4,11 @@ describe('lift.os', function()
   local su = require 'spec.util'
 
   it('offers sh() to execute a shell command', su.async(function()
-    local out, err = os.sh'echo Hello world!'
+    local out, err = assert(os.sh'echo Hello world!')
     assert.equal('Hello world!\n', out)
     assert.equal('', err)
 
-    out, err = os.sh[[lua -e "io.stderr:write'Hello from stderr'"]]
+    out, err = assert(os.sh[[lua -e "io.stderr:write'Hello from stderr'"]])
     assert.equal('', out)
     assert.equal('Hello from stderr', err)
 

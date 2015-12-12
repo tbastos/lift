@@ -7,7 +7,7 @@ expose("lift.async", function()
 
   local TOLERANCE = 20 -- time tolerance for timer callbacks
   if os.getenv('CI') then
-    TOLERANCE = 50 -- increase tolerance in CI build servers
+    TOLERANCE = 60 -- increase tolerance in CI build servers
   end
 
   it("offers run() to run all async functions to completion", function()
