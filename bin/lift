@@ -14,26 +14,15 @@ require'lift.color'.set_enabled(os.getenv('TERM') or os.getenv('ANSICON'))
 config.set_const('APP_LOAD_PATH', config.LIFT_SRC_DIR..'/files/lift')
 
 os.exit(diagnostics.wrap(function()
-
-  -- parse key=value configs at the beginning of arg list
-  local cli_scope = config:new_parent('cli')
-  cli.parse_config(arg)
-  diagnostics.set_tracing(config:get_bool('tracing'))
-
   -- run init scripts
   local top_scope = loader.init()
 
-  -- make cli configs override init configs
-  assert(top_scope:get_parent() == cli_scope)
-  top_scope:set_parent(cli_scope:get_parent())
-  cli_scope:set_parent(config:get_parent())
-  config:set_parent(cli_scope)
-
-  -- run CLI scripts
+  -- run command-line interface scripts
   local app = cli.new()
+  config:new_parent('cli')
   loader.load_all('cli', nil, app)
 
-  -- default command is an alias to the 'task run' command
+  -- root command is an alias to the 'task run' command
   app:delegate_to(app:get_command('task run'))
 
   -- command 'list' is an alias to 'task list'

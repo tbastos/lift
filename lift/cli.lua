@@ -176,21 +176,6 @@ function Command:error(msg, ...)
   diagnostics.report{command = self, 'cli_error: '..msg, ...}
 end
 
--- Parses key=value config settings at the beginning of the args list.
-local function parse_config(args)
-  assert(type(args) == 'table', 'missing args')
-  local n, size = 1, #args
-  while n <= size do
-    local s = args[n]
-    if s:sub(1, 1) == '-' then break end
-    local _, e, key = s:find('^([^=]+)=')
-    if not e then break end
-    config[key] = s:sub(e + 1)
-    n = n + 1
-  end
-  return n - 1
-end
-
 local function process_option(option, value, next_arg)
   local used_next = false
   if option.is_flag then
@@ -395,7 +380,6 @@ end
 
 local M = {
   new = new,
-  parse_config = parse_config,
 }
 
 return M

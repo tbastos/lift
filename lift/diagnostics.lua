@@ -315,7 +315,7 @@ end
 ------------------------------------------------------------------------------
 
 -- master switch
-local tracing = false -- disabled by default
+local tracing = os.getenv'TRACING' or os.getenv'LIFT_TRACING' or false
 local tracing_switch = {} -- list of closures that can switch tracing on/off
 local function set_tracing(v)
   for i = 1, #tracing_switch do

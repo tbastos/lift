@@ -10,6 +10,7 @@ local getenv, tinsert = os.getenv, table.insert
 
 local util = require 'lift.util'
 local ls = require 'lift.string'
+local str_to_bool, str_to_list = ls.to_bool, ls.to_list
 
 ------------------------------------------------------------------------------
 -- The immutable root scope (methods, constants, access to env vars)
@@ -81,23 +82,22 @@ setmetatable(config, configMT)
 -- Gets a var as a boolean.
 function root:get_bool(var_name)
   local v = self[var_name] ; if not v or v == true then return v end
-  if type(v) == 'string' then v = ls.to_bool(v) else v = true end
+  if type(v) == 'string' then v = str_to_bool(v) else v = true end
   self[var_name] = v
   return v
 end
 
 -- Gets a var as a list. If the variable is a scalar it will be first converted
--- to a list. Strings are split using lift.string.split(), other values are
+-- to a list. Strings are split using lift.string.to_list(), other values are
 -- simply wrapped in a table.
 function root:get_list(var_name, read_only)
   local v = self[var_name] ; local tp = type(v)
   if tp == 'table' then return v end
-  local t = {}
+  local t
   if tp == 'string' then -- split strings
-    local i = 0
-    for s in ls.split(v) do i = i + 1 ; t[i] = s end
+    t = str_to_list(v)
   else -- return {v}
-    t[1] = v
+    t = {v}
   end
   if not read_only then
     self[var_name] = t -- update value

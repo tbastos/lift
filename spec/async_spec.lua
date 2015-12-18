@@ -24,7 +24,7 @@ expose("lift.async", function()
   end)
 
   it("forbids the main thread from blocking", function()
-    assert.error_match(function() async.sleep(10) end, 
+    assert.error_match(function() async.sleep(10) end,
       'not in a lift.async coroutine')
   end)
 

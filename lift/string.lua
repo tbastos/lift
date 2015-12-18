@@ -6,11 +6,13 @@ local tostring, tonumber = tostring, tonumber
 local str_find, str_gmatch, str_gsub = string.find, string.gmatch, string.gsub
 local str_sub, str_upper = string.sub, string.upper
 
+local WINDOWS = require'lift.util'._WINDOWS
+
 local lpeg = require 'lpeg'
 local P, R, V, Ca, Cs = lpeg.P, lpeg.R, lpeg.V, lpeg.Carg, lpeg.Cs
 
 ------------------------------------------------------------------------------
--- Basic Transformations
+-- Basic transformations
 ------------------------------------------------------------------------------
 
 -- Returns the Capitalized form of a string
@@ -38,6 +40,21 @@ local function dasherize(str)
   return (str_gsub(str, '%W+', '-'))
 end
 
+------------------------------------------------------------------------------
+-- Iterate substrings by splitting at any character in a set of delimiters
+------------------------------------------------------------------------------
+
+local DELIMITERS = (WINDOWS and ';,' or ':;,')
+
+local function split(str, delimiters)
+  delimiters = delimiters or DELIMITERS
+  return str_gmatch(str, '([^'..delimiters..']+)['..delimiters..']*')
+end
+
+------------------------------------------------------------------------------
+-- String-to-type conversions
+------------------------------------------------------------------------------
+
 local BOOLEANS = {
   ['1'] = true, ON = true, TRUE = true, Y = true, YES = true,
   ['0'] = false, FALSE = false, N = false, NO = false, OFF = false,
@@ -47,6 +64,41 @@ local BOOLEANS = {
 local function to_bool(str)
   return BOOLEANS[str_upper(str)]
 end
+
+-- Splits a string on ';' or ',' (or ':' on UNIX).
+-- Can be used to split ${PATH}. Returns an iterator, NOT a table.
+local LIST_ELEM_PATT = '([^'..DELIMITERS..']+)['..DELIMITERS..']*'
+local function to_list(str)
+  local t = {}
+  for substr in str_gmatch(str, LIST_ELEM_PATT) do
+    t[#t+1] = substr
+  end
+  return t
+end
+
+------------------------------------------------------------------------------
+-- Line-ending conversions
+------------------------------------------------------------------------------
+
+local function lf_to_crlf(text)
+  str_gsub(text, '\n', '\r\n')
+end
+
+local function crlf_to_lf(text)
+  str_gsub(text, '\r\n', '\n')
+end
+
+local function native_to_lf(text)
+  return WINDOWS and crlf_to_lf(text) or text
+end
+
+local function lf_to_native(text)
+  return WINDOWS and lf_to_crlf(text) or text
+end
+
+------------------------------------------------------------------------------
+-- Pattern-matching utilities
+------------------------------------------------------------------------------
 
 -- Escapes any "magic" character in str for use in a Lua pattern.
 local function escape_magic(str)
@@ -71,20 +123,7 @@ local function from_glob(glob)
 end
 
 ------------------------------------------------------------------------------
--- Split string
-------------------------------------------------------------------------------
-
-local DELIMITERS = (require'lift.util'._UNIX and ';:,' or ';,')
-local LIST_ELEM_PATT = '([^'..DELIMITERS..']+)['..DELIMITERS..']*'
-
--- Splits a string on ';' or ',' (or ':' on UNIX).
--- Can be used to split ${PATH}. Returns an iterator, NOT a table.
-local function split(str)
-  return str_gmatch(str, LIST_ELEM_PATT)
-end
-
-------------------------------------------------------------------------------
--- String Interpolation (recursive variable expansions using LPeg)
+-- String interpolation (recursive variable expansions using LPeg)
 ------------------------------------------------------------------------------
 
 local VB, VE = P'${', P'}'
@@ -113,15 +152,20 @@ end
 ------------------------------------------------------------------------------
 
 return {
+  DELIMITERS = DELIMITERS,
   camelize = camelize,
   capitalize = capitalize,
   classify = classify,
+  crlf_to_lf = crlf_to_lf,
   dasherize = dasherize,
   decamelize = decamelize,
-  delimiters = DELIMITERS,
   escape_magic = escape_magic,
   expand = expand,
   from_glob = from_glob,
+  lf_to_crlf = lf_to_crlf,
+  lf_to_native = lf_to_native,
+  native_to_lf = native_to_lf,
   split = split,
   to_bool = to_bool,
+  to_list = to_list,
 }

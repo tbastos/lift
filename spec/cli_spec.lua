@@ -13,19 +13,6 @@ describe('lift.cli', function()
     verifier = diagnostics.Verifier.set_new()
   end)
 
-  it("parses key=value configs at the beginning of the arg list", function()
-    assert.Nil(config.foo)
-    assert.Nil(config.bar)
-    assert.equal(0, cli.parse_config{'cmd', 'foo=not', 'bar=parsed'})
-    assert.Nil(config.foo)
-    assert.Nil(config.bar)
-    local args = {'foo=hello', 'bar=world', '--opt', 'oops=1'}
-    assert.equal(2, cli.parse_config(args))
-    assert.equal('hello', config.foo)
-    assert.equal('world', config.bar)
-    assert.Nil(config.oops)
-  end)
-
   it('parses command args and calls command actions', function()
     local ok -- set to true when the root command is run
     root:action(function() ok = true end)

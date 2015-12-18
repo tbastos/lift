@@ -15,7 +15,7 @@ local from_slash, to_slash = lp.from_slash, lp.to_slash
 local clean, dir, is_abs = lp.clean, lp.dir, lp.is_abs
 
 local ls = require 'lift.string'
-local from_glob, split_string = ls.from_glob, ls.split
+local from_glob, str_to_list = ls.from_glob, ls.to_list
 
 local uv = require 'luv'
 local uv_chdir, uv_cwd = uv.chdir, uv.cwd
@@ -35,7 +35,7 @@ local function access(path, mode) return uv_access(from_slash(path), mode) end
 local function stat(path) return uv_stat(from_slash(path)) end
 
 local function _scandir_next(dir_req)
-  local t = uv_scandir_next(dir_req) -- FIXME shouldn't use tables here
+  local t = uv_scandir_next(dir_req) -- TODO this shouldn't return a table
   if not t then return end
   return t.name, t.type
 end
@@ -85,7 +85,7 @@ end
 -- default get_var
 local function index_table(t, k) return t[k] end 
 
-local ANY_DELIMITER = '['..ls.delimiters..']'
+local ANY_DELIMITER = '['..ls.DELIMITERS..']'
 
 -- Creates a path pattern table from a `glob` string.
 -- A pattern table is a list where each elem is either a string or a list.
@@ -107,9 +107,7 @@ local function glob_parse(glob, vars, get_var)
     if not v then error('no such variable ${'..name..'}', 2) end
     -- if the var is a string containing LIST_SEPS, convert it to a list
     if type(v) == 'string' and str_find(v, ANY_DELIMITER) then
-      local list, li = {}, 0
-      for str in split_string(v) do li = li + 1 ; list[li] = str end
-      v = list
+      v = str_to_list(v)
     end
     local vt = type(v)
     if vt == 'table' and #v == 1 then v, vt = v[1], nil end

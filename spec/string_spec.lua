@@ -38,11 +38,24 @@ describe('lift.string', function()
     assert.equal('by-the-way', str.dasherize('by-the-way'))
   end)
 
+  it('offers split() to iterate substrings in a string', function()
+    local t = {}
+    for p in str.split'one;two, three' do t[#t + 1] = p end
+    assert.same({'one', 'two', ' three'}, t)
+    t = {}
+    for p in str.split('zero one, two', ' ,') do t[#t + 1] = p end
+    assert.same({'zero', 'one', 'two'}, t)
+  end)
+
   it('offers to_bool() to convert a string to boolean', function()
     local bool = str.to_bool
     assert.equal(true, bool'1', bool'y', bool'TRUE', bool'yEs', bool'on')
     assert.equal(false, bool'0', bool'N', bool'false', bool'off', bool'no')
     assert.equal(nil, bool'2', bool'with', bool'disabled')
+  end)
+
+  it('offers to_list() to convert a string to a list', function()
+    assert.same({'one', 'two', 'three'}, str.to_list'one;two,three')
   end)
 
   it('offers escape_magic() to escape magic characters in Lua patterns', function()
@@ -53,12 +66,6 @@ describe('lift.string', function()
     assert.equal('/some/file%.ext', str.from_glob('/some/file.ext'))
     assert.equal('/[^/]*/file%.xy[^/]', str.from_glob('/*/file.xy?'))
     assert.equal('/[a-zA-Z]/file_[?]%.cool', str.from_glob('/[a-zA-Z]/file_[?].cool'))
-  end)
-
-  it('offers split() to iterate substrings in a list', function()
-    local t = {}
-    for p in str.split'one;two,three' do t[#t + 1] = p end
-    assert.same({'one', 'two', 'three'}, t)
   end)
 
   it('offers expand() to interpolate ${vars} in strings', function()

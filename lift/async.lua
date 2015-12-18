@@ -113,8 +113,8 @@ function Future:__tostring()
     (arg and ', ' or '')..(arg and tostring(arg) or '')..')'
 end
 
--- Adds a function to be called when the future's thread finishes.
--- Arguments passed to callback: future, error (or nil), results (table, or nil)
+-- Registers a function to be called when the future's thread finishes.
+-- Signature: function(future, error or nil, results table or nil)
 function Future:on_ready(callback)
   local status = self.status
   if status then -- call callback immediately
@@ -221,32 +221,30 @@ local function wait(future, timeout)
   end
   local this_future = co_get()
   if future == this_future then error('future cannot wait for itself', 2) end
-  local err, res
+  local res, err, cb
   if timeout then
     local timer = uv_new_timer()
-    local function callback(_future, _err, _res)
-      if timer == nil then return false end -- ignore second call
-      if _future then err, res = _err, _res
-      else res = 'timed out' end
-      resume_soon(this_future)
-      uv_close(timer)
-      timer = nil
-      return true
-    end
-    uv_timer_start(timer, timeout, 0, callback)
-    future:on_ready(callback)
-    co_yield()
-    if res == 'timed out' then return false, res end
+    cb = function(_future, _err, _res)
+        if timer == nil then return false end -- ignore second call
+        if _future then res, err = _res, _err
+        else res, err = false, 'timed out' end
+        resume_soon(this_future)
+        uv_close(timer)
+        timer = nil
+        return true
+      end
+    uv_timer_start(timer, timeout, 0, cb)
   else
-    future:on_ready(function(_, _err, _res)
-      err, res = _err, _res
-      resume_soon(this_future)
-      return true
-    end)
-    co_yield()
+    cb = function(_, _err, _res)
+        err, res = _err, _res
+        resume_soon(this_future)
+        return true
+      end
   end
+  future:on_ready(cb)
+  co_yield()
   if err then
-    err.future = future
+    if err ~= 'timed out' then err.future = future end
     return false, err
   end
   return true, res
@@ -287,7 +285,7 @@ end
 
 -- Suspends the calling thread until all futures in the list become ready.
 -- Returns true when all futures are fulfilled, or false and a diagnostic
--- object when errors occur (the diagnostic aggregates all raised errors).
+-- object when errors occur. The diagnostic aggregates all raised errors.
 local function wait_all(futures)
   local n, errors, this_future = #futures, nil, co_get()
   local function callback(future, err, res)
