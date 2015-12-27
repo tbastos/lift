@@ -8,6 +8,7 @@ local async = require 'lift.async'
 local function async_it_function(f)
   return function()
     local future = async(f)
+    future:on_ready(function() async.abort() end)
     async.run()
     future:check_error()
     async.check_errors()

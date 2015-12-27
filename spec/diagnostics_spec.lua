@@ -118,11 +118,11 @@ error: 3 diagnostics
         :source_location('dummy.lua', 'omg error', 5):report()
     end)
     local error_log = io.tmpfile()
-    diagnostics.set_tracing(true)
+    local original = diagnostics.set_tracing(true)
     diagnostics.set_stderr(error_log)
     diagnostics.wrap(function() f() end)
     diagnostics.set_stderr(io.stderr)
-    diagnostics.set_tracing(false)
+    diagnostics.set_tracing(original)
     error_log:seek('set')
     local out = error_log:read('*a')
     assert.match([[

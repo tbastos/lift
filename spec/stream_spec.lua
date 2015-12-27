@@ -1,26 +1,46 @@
 describe('lift.stream', function()
 
-  local stream = require 'lift.stream'
   local su = require 'spec.util'
+  local stream = require 'lift.stream'
+
+  local co_yield = coroutine.yield
+  local async = require 'lift.async'
+  local async_get, async_resume = async._get, async._resume
 
   describe("readable stream", function()
-
-    it("can be read synchronously", su.async(function()
-      local list = {} ; for i = 1, 20 do list[i] = i end
-      local s = stream.from_list(list)
+    it("can be read from synchronously", su.async(function()
+      local t = {} ; for i = 1, 20 do t[i] = i end
+      local s = stream.from_array(t)
       for i = 1, 20 do
-        assert.equal(i, s:read())
+        assert.equal(i, s:try_read())
       end
     end))
 
+    it("can be piped to another (writable) stream", su.async(function()
+      local in1 = {'str', 3.14, {x = 1}, true, false}
+      local in2 = {1, 2, 3}
+      local in3 = {4, 5, 6}
+      local out = {}
+      local to_out = stream.to_array(out)
+      stream.from_array(in1):pipe(to_out, true) -- keep to_out open
+      assert.same(in1, out)
+      assert.False(to_out:has_finished())
+      stream.from_array(in2):pipe(to_out, false) -- close to_out (default)
+      assert.True(to_out:has_finished())
+      assert.not_same(in1, out)
+      local expected = {'str', 3.14, {x = 1}, true, false, 1, 2, 3}
+      assert.same(expected, out)
+      assert.error(function() stream.from_array(in3):pipe(to_out) end,
+        'cannot write() past the end of the stream')
+      assert.same(expected, out)
+    end))
   end)
 
   describe("writable stream", function()
-
-    it("can be written to synchronously", function()
+    it("can be written to", function()
       local list = {}
-      local s = stream.to_list(list)
-      local n = s.w_hwm * 2 + 3
+      local s = stream.to_array(list)
+      local n = s.high_water * 2 + 3
       for i = 1, n do
         s:write(i)
       end
@@ -29,6 +49,85 @@ describe('lift.stream', function()
         assert.equal(i, list[i])
       end
     end)
+    pending("implements flow control", function()
+      -- for i = 1, 10 do input[#input+1] = i*i end
+    end)
+  end)
+
+  describe("uv streams", function()
+    local uv = require 'luv'
+
+    -- use a TCP echo server to test uv streams
+    local function create_server(host, port, on_connection)
+      local server = uv.new_tcp()
+      uv.tcp_bind(server, host, port)
+      uv.listen(server, 128, function(err)
+        assert(not err, err)
+        local client = uv.new_tcp()
+        uv.accept(server, client)
+        on_connection(client)
+      end)
+      return server
+    end
+    local function create_echo_server()
+      local server = create_server('127.0.0.1', 0, function(client)
+        uv.read_start(client, function(err, chunk)
+          assert(not err, err)
+          if chunk then -- echo anything received
+            uv.write(client, chunk)
+          else -- when the stream ends, close the socket
+            uv.close(client)
+          end
+        end)
+      end)
+      return uv.tcp_getsockname(server)
+    end
+    local function new_echo_stream(server_addr)
+      local client = uv.new_tcp()
+      local this_future = async_get()
+      uv.tcp_connect(client, "127.0.0.1", server_addr.port, function(err)
+        assert(not err, err)
+        async_resume(this_future)
+      end)
+      co_yield()
+      return client
+    end
+
+    it("can be written to and read from synchronously", su.async(function()
+      local server_addr = create_echo_server()
+      local echo = new_echo_stream(server_addr)
+      local to_uv = stream.to_uv(echo)
+      local from_uv = stream.from_uv(echo)
+      to_uv:write('Hello one') -- writes are async
+      to_uv:write('Hello two')
+      to_uv:write()
+      assert.equal('Hello oneHello two', from_uv:read()) -- read() is sync
+      assert.Nil(from_uv:read())
+    end))
+
+    it("can be piped to and from simplex streams", su.async(function()
+      local server_addr = create_echo_server()
+      local echo = new_echo_stream(server_addr)
+      local to_uv = stream.to_uv(echo)
+      local from_uv = stream.from_uv(echo)
+      local in1 = {'One', 'Two', 'Three'}
+      local in2 = {'Four', 'Five'}
+      local out = {} -- everything is written here
+      stream.from_array(in1):pipe(to_uv, true)
+      from_uv:pipe(stream.to_array(out), true)
+      async.sleep(20) -- wait for the message to be echoed by the TCP stream
+      async.sleep(20) -- safety margin
+      assert.equal('OneTwoThree', table.concat(out))
+      to_uv:cork() -- buffer messages
+      stream.from_array(in2):pipe(to_uv)
+      assert.equal('OneTwoThree', table.concat(out)) -- same thing
+      to_uv:uncork() -- propagate messages
+      from_uv:wait_end()
+      assert.equal('OneTwoThreeFourFive', table.concat(out))
+    end))
+
+    pending("can be piped to/from a chain of duplex streams", su.async(function()
+    end))
 
   end)
 

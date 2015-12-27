@@ -2,12 +2,14 @@
 -- Child process management and operating system utility functions
 ------------------------------------------------------------------------------
 
-local assert, setmetatable = assert, setmetatable
+local assert, getmetatable, setmetatable = assert, getmetatable, setmetatable
 local co_yield = coroutine.yield
 local diagnostics = require 'lift.diagnostics'
 local native_to_lf = require'lift.string'.native_to_lf
 local async = require 'lift.async'
 local async_get, async_resume = async._get, async._resume
+local stream = require 'lift.stream'
+local from_uv, to_uv = stream.from_uv, stream.to_uv
 local util = require 'lift.util'
 local UNIX, WINDOWS = util._UNIX, util._WINDOWS
 local uv = require 'luv'
@@ -68,6 +70,44 @@ function ChildProcess:wait(timeout)
   return status, signal
 end
 
+function ChildProcess:pipe(writable_process, keep_open)
+  local writable = writable_process
+  if getmetatable(writable) == ChildProcess then
+    writable = assert(writable.stdin, 'process has no stdin')
+  end
+  self.stdout:pipe(writable, keep_open)
+  return writable_process
+end
+
+function ChildProcess:write(...)
+  return self.stdin:write(...)
+end
+
+function ChildProcess:read()
+  return self.stdout:read()
+end
+
+function ChildProcess:try_read()
+  return self.stdout:try_read()
+end
+
+local function prepare_stdio(p, name, fd, readable)
+  local v, s = p[name] or 'pipe', nil
+  if v == 'pipe' then
+    v = uv_new_pipe(false)
+    s = (readable and from_uv or to_uv)(v)
+  elseif v == 'ignore' then
+    v = nil
+  elseif v == 'inherit' then
+    v = fd
+    s = (readable and from_uv or to_uv)(uv.new_tty(fd, not readable))
+  else
+    error("invalid stdio option '"..tostring(v).."'", 3)
+  end
+  p[name] = s
+  return v
+end
+
 local spawn = diagnostics.trace(
   '[os] spawning process ${t}',
   function(p)
@@ -75,13 +115,9 @@ local spawn = diagnostics.trace(
     if not file then error('you must specify a file to spawn()', 2) end
     p.args = p
     -- handle stdio options
-    local si, so, se = p.stdin or 'pipe', p.stdout or 'pipe', p.stderr or 'pipe'
-    if si == 'pipe' then si = uv_new_pipe(false)
-    elseif si == 'ignore' then si = nil elseif si == 'inherit' then si = 0 end
-    if so == 'pipe' then so = uv_new_pipe(false)
-    elseif so == 'ignore' then so = nil elseif so == 'inherit' then so = 1 end
-    if se == 'pipe' then se = uv_new_pipe(false)
-    elseif se == 'ignore' then se = nil elseif se == 'inherit' then se = 2 end
+    local si = prepare_stdio(p, 'stdin',  0, false)
+    local so = prepare_stdio(p, 'stdout', 1, true)
+    local se = prepare_stdio(p, 'stderr', 2, true)
     p.stdio = {si, so, se} -- TODO we could avoid using a table for stdio
     -- hide console windows by default on Windows
     if WINDOWS and p.hide == nil then p.hide = true end

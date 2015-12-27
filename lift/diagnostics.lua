@@ -315,13 +315,15 @@ end
 ------------------------------------------------------------------------------
 
 -- master switch
-local tracing = os.getenv'TRACING' or os.getenv'LIFT_TRACING' or false
+local tracing = ((os.getenv'TRACING' or os.getenv'LIFT_TRACING') ~= nil)
 local tracing_switch = {} -- list of closures that can switch tracing on/off
 local function set_tracing(v)
   for i = 1, #tracing_switch do
     tracing_switch[i](v)
   end
+  local original = tracing
   tracing = v
+  return original
 end
 
 -- helpers to expand trace messages

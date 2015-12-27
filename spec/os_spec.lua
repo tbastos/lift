@@ -46,7 +46,7 @@ describe('lift.os', function()
 
     it("can inherit fds from parent and be waited for", su.async(function()
       local c = assert(os.spawn{file = 'echo', '\nHello from child process',
-        stdin = 'ignore', stdout = 1, stderr = 2})
+        stdin = 'ignore', stdout = 'inherit', stderr = 'inherit'})
       assert.Nil(c.status)
       c:wait()
       assert.equal(0, c.status, c.signal)
@@ -69,20 +69,60 @@ describe('lift.os', function()
       assert.equal(signal, 'timed out')
     end))
 
-    it("can be written to (stdin) and read from (stdout and stderr)", su.async(function()
-      -- local c = assert(os.spawn{file = 'cat'})
-      -- c:write('One')
-      -- c.stdin:write('Two')
-      -- c:shutdown()
-      -- local out = c:read()
-      -- assert.equal('One\nTwo\n', out)
-      -- local err = c.stderr:read()
-      -- assert.equal('', err)
+    it("can be read from (stdout, stderr)", su.async(function()
+      local c = assert(os.spawn{file = 'echo', 'Hello world', stdin = 'ignore'})
+      assert.Nil(c:try_read())
+      assert.Nil(c.stderr:try_read())
+      c:wait() -- await exit before reading
+      assert.equal('Hello world\n', c:try_read())
+      assert.Nil(c.stderr:try_read())
     end))
 
-    it("can be piped to another process", function()
-      -- body
-    end)
+    it("can be written to (stdin) and read from (stdout)", su.async(function()
+      local c = assert(os.spawn{file = 'cat'})
+      c:write('One')
+      c.stdin:write('Two')
+      c:write() -- shuts down stdin, causing 'cat' to exit
+      assert.Nil(c.stdout:try_read())
+      assert.Nil(c.stderr:try_read())
+      c:wait() -- await exit before reading
+      assert.equal('OneTwo', c:try_read())
+      assert.Nil(c.stderr:try_read())
+    end))
+
+    it("can be written to (stdin) and read from (stderr)", su.async(function()
+      local c = assert(os.spawn{file = 'lua',
+          '-e', 'io.stderr:write(io.read())', stdout = 'ignore'})
+      c:write('Hello from stderr')
+      c:write() -- shuts down stdin, causing 'lua' to exit
+      assert.Nil(c.stdout)
+      assert.Nil(c.stderr:try_read())
+      c:wait() -- await exit before reading
+      assert.equal('Hello from stderr', c.stderr:try_read())
+    end))
+
+    it("can be written to (stdin) and read from (stdout) synchronously", su.async(function()
+      local c = assert(os.spawn{file = 'cat'})
+      c:write('One')
+      c.stdin:write('Two')
+      assert.equal('OneTwo', c:read())
+      c:write('Three')
+      assert.equal('Three', c:read())
+      c:write()
+      assert.Nil(c:read())
+      assert.Nil(c.stderr:read())
+    end))
+
+    it("can be piped to another process", su.async(function()
+      local echo1 = assert(os.spawn{file = 'echo', '-n', 'OneTwoThree', stdin = 'ignore'})
+      local echo2 = assert(os.spawn{file = 'echo', '-n', 'FourFive', stdin = 'ignore'})
+      local cat1 = assert(os.spawn{file = 'cat'})
+      local cat2 = assert(os.spawn{file = 'cat'})
+      echo1:pipe(cat1, true) -- pipe to cat1 and keep cat1 open
+      echo2:pipe(cat1) -- pipe to cat1 and shut down cat1
+      cat1:pipe(cat2)
+      assert.equal('OneTwoThreeFourFive', cat2:read())
+    end))
 
   end)
 
