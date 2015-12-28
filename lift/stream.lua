@@ -32,16 +32,17 @@ function Stream:__tostring()
   return self.id or tostring(self.reader or self.writer)
 end
 
+-- Registers a function to be called once more data is available for reading,
+-- after a try_read() or read() call returns false.
+-- The call is only made once. Prototype: cb(stream).
+function Stream:on_readable(callback) -- consumer, readable
+  error('not a readable stream')
+end
+
 -- Registers a function to be called whenever data is read from the stream.
 -- Prototype: cb(stream, data, err). The end of the stream is signaled
 -- with cb(s, nil, nil); or when an error occurs, with cb(s, nil, err).
 function Stream:on_data(callback) -- consumer, readable
-  error('not a readable stream')
-end
-
--- Registers a function to be called once data becomes available for reading.
--- Assumes stream is currently drained. Calls only once: cb(stream).
-function Stream:on_readable(callback) -- consumer, readable
   error('not a readable stream')
 end
 
@@ -92,48 +93,12 @@ function Stream:read() -- consumer, readable
   error('not a readable stream')
 end
 
--- Makes the `writable` stream receive all data flowing out of this stream,
--- automatically managing the flow so that `writable` is not overwhelmed by
--- a fast readable stream. If `keep_open` is true, the end-of-stream marker
--- (nil) is not sent to `writable` when this stream ends successfully (errors
--- are still sent). Returns `writable`.
+-- Relays all data flowing out of this stream to the given `writable` stream,
+-- automatically managing the flow so that the `writable` is not overwhelmed.
+-- If `keep_open` is true, the end-of-stream marker (nil) is not relayed when
+-- the stream ends normally. Errors are still sent. Returns `writable`.
 function Stream:pipe(writable, keep_open) -- consumer, readable
   error('not a readable stream')
-end
-
--- Removes the hooks set up for a previous pipe() call.
--- If `writable` is not specified, all pipes are removed.
--- If `writable` is specified but no pipe is set up for it, this is a no-op.
-function Stream:unpipe(writable) -- consumer, readable
-  error('not a readable stream')
-end
-
--- Registers a function to be called once all stream data has been written
--- and flushed to the underlying resource (after the stream's end).
-function Stream:on_finish(callback) -- consumer, writable
-  error('not a writable stream')
-end
-
--- Suspends the current thread until all stream data has been written
--- and flushed to the underlying resource (after the stream's end).
-function Stream:wait_finish() -- consumer, writable
-  error('not a writable stream')
-end
-
--- Returns whether all stream data has been written and flushed to the
--- underlying resource (after the stream's end).
-function Stream:has_finished() -- consumer, writable
-  error('not a writable stream')
-end
-
--- Forces buffering of all writes until next uncork() or the end of stream.
-function Stream:cork() -- consumer, writable
-  error('not a writable stream')
-end
-
--- Flushes all data buffered since last cork() call.
-function Stream:uncork() -- consumer, writable
-  error('not a writable stream')
 end
 
 -- Writes `data` to the underlying system. Call write(nil) to signal the end
@@ -143,21 +108,48 @@ function Stream:write(data, err) -- consumer, writable
   error('not a writable stream')
 end
 
+-- Registers a function to be called once it is appropriate to begin writing
+-- more data to the stream, after a write() call returns false.
+-- The call is only made once. Prototype: cb(stream).
+function Stream:on_drain(callback) -- consumer, writable
+  error('not a writable stream')
+end
+
+-- Registers a function to be called once the stream has been fully written
+-- and flushed to the underlying resource.
+function Stream:on_finish(callback) -- consumer, writable
+  error('not a writable stream')
+end
+
+-- Suspends the current thread until the stream has been fully written
+-- and flushed to the underlying resource.
+function Stream:wait_finish() -- consumer, writable
+  error('not a writable stream')
+end
+
+-- Returns whether the stream has been fully written and flushed to the
+-- underlying resource.
+function Stream:has_finished() -- consumer, writable
+  error('not a writable stream')
+end
+
 ------------------------------------------------------------------------------
 -- Readable stream
 ------------------------------------------------------------------------------
 
-local Readable = {flowing = false}
-for k, v in pairs(Stream) do Readable[k] = v end -- inherit from Stream
+local Readable = {
+  flowing = false,  -- whether the stream is in flowing mode or paused
+  waiting = 0,      -- number of drain events the stream is waiting to restart
+}
 Readable.__index = Readable
+
+function Readable:on_readable(callback)
+  self[#self+1] = callback
+end
 
 function Readable:on_data(consumer)
   local t = self.consumers
   t[#t+1] = consumer
-end
-
-function Readable:on_readable(callback)
-  self[#self+1] = callback
 end
 
 function Readable:on_end(callback)
@@ -174,7 +166,7 @@ function Readable:wait_end()
 end
 
 function Readable:has_ended()
-  return not self.rbuf
+  return self.rbuf == nil
 end
 
 local function flow(self)
@@ -296,54 +288,54 @@ end
 Readable.pipe = diagnostics.trace(
   '[stream] creating pipe from ${self} to ${writable} ${keep_open}',
   function(self, writable, keep_open)
-    assert(writable, 'missing writable stream')
-    local cb
-    if keep_open then
-      cb = function(stream, data, err)
-        if data ~= nil or err ~= nil then
-          writable:write(data, err)
+    assert(writable, "missing argument 'writable'")
+    local function drained()
+      local n = self.waiting - 1 ; self.waiting = n
+      if n == 0 then self:start() end
+    end
+    self:on_data(function(stream, data, err)
+      if data ~= nil or err ~= nil or not keep_open then
+        if not writable:write(data, err) and data ~= nil then
+          self.waiting = self.waiting + 1
+          writable:on_drain(drained)
+          self:stop()
         end
       end
-    else
-      cb = function(stream, data, err)
-        writable:write(data, err)
-      end
-    end
-    self.consumers[writable] = cb
+    end)
     self:start()
     return writable
   end)
 
-Readable.unpipe = diagnostics.trace(
-  '[stream] removing pipe from ${self} to ${writable}',
-  function(self, writable)
-    local consumers = self.consumers
-    if writable then
-      consumers[writable] = nil
-    else -- unpipe all streams
-      for k, v in pairs(consumers) do
-        if type(k) ~= 'number' then
-          consumers[k] = nil
-        end
-      end
-    end
-  end)
+local function init_readable(self, reader)
+  self.reader = reader
+  self.rbuf, self.consumers = {}, {}
+  return self
+end
 
 -- Creates a readable stream that calls reader(stream) when it needs more data
 -- from the stream's underlying resource. The `reader` should call push() to
 -- feed in data for as long as push() returns true. Once push() returns false,
 -- it should stop reading until the next call to `reader`.
-local function new_readable(reader, id) -- for implementers
-  return setmetatable({id = id, reader = reader, rbuf = {}, consumers = {}}, Readable)
+local function new_readable(reader, id)
+  return setmetatable(init_readable({id = id}, reader), Readable)
 end
 
 ------------------------------------------------------------------------------
 -- Writable stream
 ------------------------------------------------------------------------------
 
-local Writable = {corked = 0}
-for k, v in pairs(Stream) do Writable[k] = v end -- inherit from Stream
+local Writable = {}
 Writable.__index = Writable
+
+Writable.write = diagnostics.trace(
+  '[stream] writing to ${self}: ${data} ${err}',
+  function(self, data, err)
+    return self.request_write(data, err)
+  end)
+
+function Writable:on_drain(callback)
+  self[#self+1] = callback
+end
 
 function Writable:on_finish(callback)
   local t = self.on_finish_cb
@@ -359,81 +351,90 @@ function Writable:wait_finish()
 end
 
 function Writable:has_finished()
-  return not self.wbuf
+  return self.write_error ~= nil
 end
 
-function Writable:shutdown()
-  self.wbuf = nil
-  local t = self.on_finish_cb
-  if not t then return end
-  for i = 1, #t do
-    t[i](self)
-  end
-end
-
-function Writable:cork()
-  self.corked = self.corked + 1
-end
-
-local function clear_buffer(self)
-  -- send data chunks
-  local buf = self.wbuf
-  local n = #buf
-  if n > 1 then -- many chunks
-    local write_many = self.write_many
-    if write_many then -- use write_many if available
-      self:write_many(buf)
-    else
-      for i = 1, n do
-        self:writer(buf[i])
-      end
+-- send 'on_drain' event
+local send_drain = diagnostics.trace('[stream] drained: ${self}',
+  function(self)
+    for i = 1, #self do
+      self[i](self)
+      self[i] = nil
     end
-  elseif n == 1 then -- one chunk
-    self:writer(buf[1])
-  end
-  -- send end of stream
-  local err = self.write_error
-  if err ~= nil then self:writer(nil, err) end
-end
-
-function Writable:uncork()
-  local corked = self.corked
-  self.corked = corked - 1
-  if corked == 1 then
-    clear_buffer(self)
-  end
-end
-
-Writable.write = diagnostics.trace(
-  '[stream] writing to ${self}: ${data} ${err}',
-  function(self, data, err)
-    assert(self.write_error == nil, 'cannot write() past the end of the stream')
-    local wants_more
-    if self.corked == 0 then -- uncorked: send data directly to writer
-      self:writer(data, err)
-      wants_more = true
-    elseif data ~= nil then  -- corked: buffer data
-      local buf = self.wbuf
-      local n = #buf
-      buf[n+1] = data
-      wants_more = (n < self.high_water)
-    end
-    if data == nil then -- stream has ended
-      self.write_error = err or false
-      wants_more = false
-    end
-    return wants_more
   end)
 
--- Creates a writable stream that calls writer(stream, data) when it needs to
--- send data to the stream's underlying resource. The end of the stream is
--- signaled with writer(nil), or in case of errors with writer(nil, err).
--- If write_many is provided, the stream will call write_many(stream, chunks)
--- when it needs to write many buffered chunks of data, instead of calling
--- writer(stream, data) many times.
-local function new_writable(writer, write_many, id) -- for implementers
-  return setmetatable({id = id, writer = writer, write_many = write_many,
-      wbuf = {}}, Writable)
+-- terminate stream and send 'on_finish' event
+local shutdown = diagnostics.trace('[stream] finished: ${self}',
+  function(self, err)
+    self.write_error = err
+    local t = self.on_finish_cb
+    if not t then return end
+    for i = 1, #t do
+      t[i](self)
+    end
+  end)
+
+-- Constructs a writable stream.
+local function init_writable(self, writer, write_many)
+  local writing, buf, ended_with_err, sent_end
+  local function callback(err)
+    if buf then
+      local chunks = buf ; buf = nil
+      send_drain(self)
+      return write_many(self, chunks, callback)
+    end
+    if err then ended_with_err = err end -- overwrite any preexisting error
+    if ended_with_err ~= nil then -- stream has ended
+      if sent_end then -- ready to shutdown
+        return shutdown(self, ended_with_err)
+      else -- the end of stream was buffered, we still have to send it
+        sent_end = true
+        return writer(self, nil, ended_with_err, callback)
+      end
+    end
+    writing = false
+  end
+  if not write_many then
+    write_many = function(self, buf, last_cb) -- luacheck: ignore
+      local i = 1
+      local function write_next(err)
+        if err then return last_cb(err) end
+        i = i + 1
+        if i <= #buf then
+          return writer(self, buf[i], nil, write_next)
+        end
+        return last_cb()
+      end
+      return writer(self, buf[i], nil, write_next)
+    end
+  end
+  function self.request_write(data, err)
+    assert(ended_with_err == nil, 'cannot write() past the end of the stream')
+    if data == nil then -- end of stream
+      ended_with_err = err or false
+      if writing then return false else sent_end = true end
+    elseif writing or buf then -- buffer a data chunk
+      if buf == nil then buf = {data} return true end
+      local n = #buf ; buf[n+1] = data
+      return n < self.high_water
+    end
+    writing = true
+    writer(self, data, err, callback) -- write data or the end of stream
+    return (data ~= nil)
+  end
+  return self
+end
+
+-- Creates a writable stream that calls writer(stream, data, err, callback)
+-- when it needs to send data to the stream's underlying resource. The writer
+-- must call callback(err) when it's done processing the data chunk, and if a
+-- non-nil `err` is specified the stream ends with a write error. The end of
+-- the stream is signaled with data = nil; and in this case, `err` is false if
+-- the stream ended normally, or an error object otherwise. If `write_many` is
+-- provided, the stream will call write_many(stream, chunks, callback) when it
+-- needs to write many chunks of data, instead of calling `writer` many times.
+local function new_writable(writer, write_many, id)
+  return setmetatable(init_writable({id = id}, writer, write_many), Writable)
 end
 
 ------------------------------------------------------------------------------
@@ -441,38 +442,95 @@ end
 ------------------------------------------------------------------------------
 
 local Duplex = {}
-for k, v in pairs(Readable) do Duplex[k] = v end -- inherit from Readable
-for k, v in pairs(Writable) do Duplex[k] = v end -- inherit from Writable
 Duplex.__index = Duplex
 
+local function new_duplex(reader, writer, write_many, id)
+  local self = init_readable({id = id}, reader)
+  return setmetatable(init_writable(self, writer, write_many), Duplex)
+end
+
 ------------------------------------------------------------------------------
--- Array Streams (for tests)
+-- Inheritance
 ------------------------------------------------------------------------------
 
--- Creates a stream that reads data from an array (for tests).
-local function from_array(t)
-  local i, n = 1, #t
-  return new_readable(function(stream)
+local function inherit_from(child, parent)
+  for k, v in pairs(parent) do
+    if child[k] == nil then
+      child[k] = v
+    end
+  end
+end
+
+inherit_from(Duplex, Readable)
+inherit_from(Duplex, Writable)
+inherit_from(Duplex, Stream)
+inherit_from(Readable, Stream)
+inherit_from(Writable, Stream)
+
+------------------------------------------------------------------------------
+-- Array Streams (test helpers)
+------------------------------------------------------------------------------
+
+local function array_id(t, delay)
+  return tostring(t):gsub('table: 0x',
+    'array'..(delay and '+' or '')..(delay or '')..'@')
+end
+
+-- Creates a stream that reads data from an array. If `delay` is given, the
+-- reader works asynchronously, reading a chunk every `delay` milliseconds.
+local function from_array(t, delay)
+  local i, n, reader = 1, #t
+  if delay then -- async reader
+    local reading = false
+    reader = function(stream)
+      if reading then return end
+      reading = true
+      async(function()
+        while 1 do
+          local data
+          if i <= n then
+            data, i = t[i], i + 1
+          end
+          if not stream:push(data) then
+            reading = false
+            return
+          end
+          async.sleep(delay)
+        end
+      end)
+    end
+  else -- sync reader
+    reader = function(stream)
       repeat
         local more = stream:push(t[i])
         i = i + 1
       until i > n or not more
       if i > n then stream:push() end
-    end, tostring(t))
+    end
+  end
+  return new_readable(reader, array_id(t, delay))
 end
 
--- Creates a stream that writes data to an array (for tests).
-local function to_array(t)
+-- Creates a stream that writes data to an array. If `delay` is given, the
+-- writer works asynchronously, writing a chunk every `delay` milliseconds.
+local function to_array(t, delay)
   local size = 1
-  return new_writable(function(stream, data, err)
-      if data == nil then
-        if err then error(err, 2) end
-        stream:shutdown()
-      else
-        t[size] = data
-        size = size + 1
-      end
-    end, nil, tostring(t))
+  local function sync_writer(stream, data, err, callback)
+    if data == nil then return callback(err) end
+    t[size] = data
+    size = size + 1
+    callback()
+  end
+  local writer = sync_writer
+  if delay then -- async writer
+    writer = function(stream, data, err, callback)
+      async(function()
+        async.sleep(delay)
+        sync_writer(stream, data, err, callback)
+      end)
+    end
+  end
+  return new_writable(writer, nil, array_id(t, delay))
 end
 
 ------------------------------------------------------------------------------
@@ -483,40 +541,56 @@ local uv = require 'luv'
 local uv_write, uv_shutdown = uv.write, uv.shutdown
 local uv_read_start, uv_read_stop = uv.read_start, uv.read_stop
 
--- Creates a stream that reads strings from an uv stream.
-local function from_uv(handle)
-  local reading, stream = false
+-- Creates a reader function for an uv stream.
+local function create_uv_reader(handle)
+  local dest_stream
   local function on_read(err, data)
-    if stream:push(data, err) == false then
-      reading = false
+    if dest_stream:push(data, err) == false then
+      dest_stream = nil
       uv_read_stop(handle)
     end
   end
-  local function reader()
-    if not reading then
-      reading = true
+  local function reader(stream)
+    if not dest_stream then
+      dest_stream = stream
       uv_read_start(handle, on_read)
     end
   end
-  stream = new_readable(reader, tostring(handle))
-  return stream
+  return reader
+end
+
+-- Creates writer and write_many functions for an uv stream.
+local function create_uv_writers(handle)
+  local function writer(stream, data, err, callback)
+    if err then return callback(err) end
+    if data then
+      uv_write(handle, data, callback)
+    else
+      uv_shutdown(handle, callback)
+    end
+  end
+  local function write_many(stream, chunks, callback)
+    uv_write(handle, chunks, callback)
+  end
+  return writer, write_many
+end
+
+-- Creates a stream that reads strings from an uv stream.
+local function from_uv(handle)
+  return new_readable(create_uv_reader(handle), tostring(handle))
 end
 
 -- Creates a stream that writes strings to an uv stream.
 local function to_uv(handle)
-  local function writer(stream, data, err)
-    if err then
-      error(err)
-    elseif data then
-      uv_write(handle, data)
-    else
-      uv_shutdown(handle, function() stream:shutdown() end)
-    end
-  end
-  local function write_many(stream, chunks)
-    uv_write(handle, chunks)
-  end
+  local writer, write_many = create_uv_writers(handle)
   return new_writable(writer, write_many, tostring(handle))
+end
+
+-- Creates a duplex stream that reads and writes strings from/to an uv stream.
+local function new_duplex_uv(handle)
+  local reader = create_uv_reader(handle)
+  local writer, write_many = create_uv_writers(handle)
+  return new_duplex(reader, writer, write_many, tostring(handle))
 end
 
 ------------------------------------------------------------------------------
@@ -524,10 +598,12 @@ end
 ------------------------------------------------------------------------------
 
 return {
-  new_readable = new_readable,
-  new_writable = new_writable,
   from_array = from_array,
   from_uv = from_uv,
+  new_duplex = new_duplex,
+  new_duplex_uv = new_duplex_uv,
+  new_readable = new_readable,
+  new_writable = new_writable,
   to_array = to_array,
   to_uv = to_uv,
 }

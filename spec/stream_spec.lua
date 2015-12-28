@@ -15,17 +15,28 @@ describe('lift.stream', function()
         assert.equal(i, s:try_read())
       end
     end))
-
+    it("can be read from asynchronously", su.async(function()
+      local t = {} ; for i = 1, 20 do t[i] = i end
+      local s = stream.from_array(t, 2)
+      assert.Nil(s:try_read())
+      async.sleep(20)
+      for i = 1, 20 do
+        assert.equal(i, s:read())
+      end
+    end))
     it("can be piped to another (writable) stream", su.async(function()
       local in1 = {'str', 3.14, {x = 1}, true, false}
       local in2 = {1, 2, 3}
       local in3 = {4, 5, 6}
       local out = {}
       local to_out = stream.to_array(out)
-      stream.from_array(in1):pipe(to_out, true) -- keep to_out open
+      local from_in1 = stream.from_array(in1) -- sync
+      from_in1:pipe(to_out, true) -- don't send end to to_out
       assert.same(in1, out)
       assert.False(to_out:has_finished())
-      stream.from_array(in2):pipe(to_out, false) -- close to_out (default)
+      local from_in2 = stream.from_array(in2, 10) -- async
+      from_in2:pipe(to_out) -- send end to to_out (default)
+      from_in2:wait_end()
       assert.True(to_out:has_finished())
       assert.not_same(in1, out)
       local expected = {'str', 3.14, {x = 1}, true, false, 1, 2, 3}
@@ -49,9 +60,17 @@ describe('lift.stream', function()
         assert.equal(i, list[i])
       end
     end)
-    pending("implements flow control", function()
-      -- for i = 1, 10 do input[#input+1] = i*i end
-    end)
+    it("implements flow control", su.async(function()
+      local n, input, output = 30, {}, {}
+      for i = 1, n do input[i] = i*i end
+      local fast_in = stream.from_array(input, 2)
+      local slow_out = stream.to_array(output, 8)
+      fast_in:pipe(slow_out)
+      fast_in:wait_end()
+      assert.not_same(input, output)
+      slow_out:wait_finish()
+      assert.same(input, output)
+    end))
   end)
 
   describe("uv streams", function()
@@ -118,15 +137,24 @@ describe('lift.stream', function()
       async.sleep(20) -- wait for the message to be echoed by the TCP stream
       async.sleep(20) -- safety margin
       assert.equal('OneTwoThree', table.concat(out))
-      to_uv:cork() -- buffer messages
       stream.from_array(in2):pipe(to_uv)
-      assert.equal('OneTwoThree', table.concat(out)) -- same thing
-      to_uv:uncork() -- propagate messages
       from_uv:wait_end()
       assert.equal('OneTwoThreeFourFive', table.concat(out))
     end))
 
-    pending("can be piped to/from a chain of duplex streams", su.async(function()
+    it("can be piped to/from a chain of duplex streams", su.async(function()
+      local server_addr = create_echo_server()
+      local one = stream.new_duplex_uv(new_echo_stream(server_addr))
+      local two = stream.new_duplex_uv(new_echo_stream(server_addr))
+      local three = stream.new_duplex_uv(new_echo_stream(server_addr))
+      one:pipe(two):pipe(three)
+      one:write('Hello from one')
+      assert.equal('Hello from one', three:read())
+      two:write('Hello from two')
+      assert.equal('Hello from two', three:read())
+      one:write()
+      assert.Nil(three:read())
+      assert.True(two:has_finished())
     end))
 
   end)
