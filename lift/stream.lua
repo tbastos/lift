@@ -202,7 +202,7 @@ local send_data = diagnostics.trace('[stream] read from ${self}: ${data} ${err}'
 local send_readable = diagnostics.trace('[stream] readable: ${self}',
   function(self)
     for i = 1, #self do
-      self[i](self)
+      async.call(self[i], self)
       self[i] = nil
     end
   end)
@@ -358,7 +358,7 @@ end
 local send_drain = diagnostics.trace('[stream] drained: ${self}',
   function(self)
     for i = 1, #self do
-      self[i](self)
+      async.call(self[i], self)
       self[i] = nil
     end
   end)

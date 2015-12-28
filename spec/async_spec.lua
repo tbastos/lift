@@ -23,6 +23,15 @@ expose("lift.async", function()
     assert.equal(5, v)
   end)
 
+  it("offers call(f, arg) to invoke a function plainly from the event loop", function()
+    local v = 0 ; local function add(x) v = v + x end
+    async.call(add, 2)
+    async.call(add, 3)
+    assert.equal(0, v)
+    async.run()
+    assert.equal(5, v)
+  end)
+
   it("forbids the main thread from blocking", function()
     assert.error_match(function() async.sleep(10) end,
       'not in a lift.async coroutine')

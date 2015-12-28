@@ -170,8 +170,38 @@ on_end = diagnostics.trace('[thread] ${future} ended with ${ok} ${res}',
   end)
 
 ------------------------------------------------------------------------------
+-- Plain f(arg) calls from the main thread (event loop)
+------------------------------------------------------------------------------
+
+local call_list = {} -- 'front' list: {f1, arg1, f2, arg2, ...}
+
+-- Invokes f(arg) in the next iteration of the event loop.
+-- Does NOT create a thread or future. Any error will abort the event loop.
+local function call(f, arg)
+  local t = call_list
+  local n = #t
+  t[n+1] = f
+  t[n+2] = arg or false
+end
+
+local function do_calls()
+  local t = call_list
+  local n = #t ; if n == 0 then return end
+  call_list = {}
+  for i = 1, n, 2 do
+    t[i](t[i+1])
+  end
+end
+
+------------------------------------------------------------------------------
 -- Module Functions
 ------------------------------------------------------------------------------
+
+-- Forces run() to exit while there are still threads waiting for events.
+-- May cause leaks and bugs. Only call if you want to terminate the application.
+local function abort()
+  uv.walk(function(h) if not h:is_closing() then h:close() end end)
+end
 
 -- Schedules a function to be called asynchronously as `f(arg)` in a coroutine.
 -- Returns a future object for interfacing with the async call.
@@ -198,14 +228,13 @@ end
 
 -- Runs all async functions to completion. Call this from the main thread.
 local function run()
-  repeat step() until not uv_run('once')
-  step() -- handles final events
-end
-
--- Forces run() to exit while there are still threads waiting for events.
--- May cause leaks and bugs. Only call if you want to terminate the application.
-local function abort()
-  uv.walk(function(h) if not h:is_closing() then h:close() end end)
+  local stop
+  while 1 do
+    do_calls()
+    step()
+    if stop then return end
+    stop = not uv_run('once')
+  end
 end
 
 -- Suspends the calling thread until `future` becomes ready, or until `timeout`
@@ -332,6 +361,7 @@ return setmetatable({
   -- Public API
   abort = abort,
   async = async,
+  call = call,
   check_errors = check_errors,
   run = run,
   running = co_get,
