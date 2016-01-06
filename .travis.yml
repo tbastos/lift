@@ -32,9 +32,8 @@ before_script:
   - luarocks install luacov-coveralls
 
 script:
-  - busted -c -v
+  - LUA_INIT="require'luacov'" busted -v
   - luarocks make
-  - lift --help
 
 after_success:
   - luacov-coveralls -v

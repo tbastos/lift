@@ -68,10 +68,19 @@ local Diagnostic = {
   level = 'error',
 }
 
+-- expands vars in a diagnostic message
+local function get_var(d, k)
+  local v = d[k]
+  if type(v) == 'function' then
+    v = v(d) -- expand functions by calling them with the diagnostic object
+  end
+  return v
+end
+
 -- compute diagnostic.message lazily
 function Diagnostic:__index(k)
   if k == 'message' then
-    local msg = ls_expand(rawget(self, 0) or 'no message', self)
+    local msg = ls_expand(rawget(self, 0) or 'no message', self, get_var)
     self.message = msg
     return msg
   end
@@ -449,41 +458,11 @@ local function wrap(f)
 end
 
 ------------------------------------------------------------------------------
--- capture(f) calls f and captures stdout and diagnostics (for testing)
-------------------------------------------------------------------------------
-
-local capturing = false
-local function capture(f)
-  assert(not capturing, "diagnostics.capture() cannot be called recursively")
-  capturing = true
-
-  -- save original output stream and diagnostics consumer
-  local o_ostream, o_consumer = io.output(), consumer
-
-  -- capture output and diagnostics
-  local fout = assert(io.tmpfile())
-  io.output(fout)
-  local verifier = Verifier.set_new()
-  local ok = pcall(f)
-  fout:seek('set')
-  local output = fout:read('*a')
-
-  -- restore original output stream and diagnostics consumer
-  set_consumer(o_consumer)
-  io.output(o_ostream)
-  fout:close()
-
-  capturing = false
-  return ok, output, verifier
-end
-
-------------------------------------------------------------------------------
 -- Module Table
 ------------------------------------------------------------------------------
 
 return {
   aggregate = aggregate,
-  capture = capture,
   check_error = check_error,
   is_a = is_a,
   levels = levels,

@@ -23,7 +23,7 @@ expose("lift.async", function()
     assert.equal(5, v)
   end)
 
-  it("offers call(f, arg) to invoke a function plainly from the event loop", function()
+  it("offers call(f, arg) to invoke a function directly from the event loop", function()
     local v = 0 ; local function add(x) v = v + x end
     async.call(add, 2)
     async.call(add, 3)
@@ -48,9 +48,6 @@ expose("lift.async", function()
       assert.falsy(a.results)
       assert.falsy(b.results)
       assert.falsy(c.results)
-      assert.False(a.status)
-      assert.False(b.status)
-      assert.False(c.status)
       async.run()
       assert.equal('fulfilled', a.status, b.status, c.status)
       assert.same({1337}, a.results)
@@ -60,7 +57,7 @@ expose("lift.async", function()
     it("stores errors in .error", function()
       local f = async(function() error('boom') end)
       assert.falsy(f.error)
-      assert.False(f.status)
+      assert.falsy(f.status)
       async.run()
       assert.equal('failed', f.status)
       assert.matches('boom', tostring(f.error))
@@ -229,6 +226,19 @@ expose("lift.async", function()
       assert.matches('caught 2 errors.*my error #1.*my error #2',
         tostring(future.error))
       async.check_errors() -- no unchecked errors
+    end)
+
+    it("may deadlock", function()
+      local a, b
+      local function wait_a() async.wait(a) end
+      local function wait_b() async.wait(b) end
+      a, b = async(wait_b), async(wait_a)
+      local c = async(function()
+        async.wait(a, 20)
+        return a.results and b.results
+      end)
+      async.run()
+      assert.False(c.results[1])
     end)
 
   end)

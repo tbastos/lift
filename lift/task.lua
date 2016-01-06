@@ -13,57 +13,46 @@ local inspect = require'lift.util'.inspect
 local diagnostics = require 'lift.diagnostics'
 
 local async = require 'lift.async'
-local await, wait_all = async.wait, async.wait_all
+local async_get, await, wait_all = async._get, async.wait, async.wait_all
 
 ------------------------------------------------------------------------------
--- Helper Functions
+-- Graph construction and cycle detection
 ------------------------------------------------------------------------------
 
-local function get_or_start(task, arg, extra)
-  local futures = task.futures
-  local future = futures[arg or 1]
-  if future then return future end -- currently running
-  -- check if the task was called correctly
-  local ns = task.ns
-  if arg == ns then
-    error('tasks must be called as .functions() not :methods()', 3)
+local roots = {} -- list of root task futures (called from non-task threads)
+
+-- Adds an edge to the graph of task (future) calls.
+local function on_call(from_future, from_task, to_future, to_task)
+  if not from_task then
+    roots[#roots + 1] = to_future
+  else
+    local t = from_future.calls
+    t[#t+1] = to_future
   end
-  if extra ~= nil then error('tasks can only take one argument', 3) end
-  -- start the task
-  future = async(task.f, arg)
-  future.task = task
-  futures[arg or 1] = future
-  return future
 end
 
-------------------------------------------------------------------------------
--- TaskList object (callable list of tasks)
-------------------------------------------------------------------------------
-
-local TaskList = {}
-
-TaskList.__call = diagnostics.trace(
-  '[task] running ${self} ${arg}',
-  '[task] finished ${self} ${arg}',
-  function(self, arg, extra)
-    local t = {}
-    for i = 1, #self do
-      t[i] = get_or_start(self[i], arg, extra)
-    end
-    local ok, err = wait_all(t)
-    if not ok then
-      if #err.nested == 1 then err = err.nested[1] end
-      err:report()
-    end
-  end)
-
-function TaskList:__tostring()
-  local t = {}
-  for i = 1, #self do
-    t[i] = tostring(self[i])
+-- Finds the first cycle in the graph of task futures.
+-- Returns nil if no cycle is found, or a circular path {a, ..., a} otherwise.
+local function visit(future, visited, dist)
+  if visited[future] then -- found cycle
+    visited[dist + 1] = future
+    return visited
   end
-  tbl_sort(t)
-  return 'task list {'..tbl_concat(t, ', ')..'}'
+  visited[future] = dist
+  dist = dist + 1
+  local calls = future.calls
+  for i = 1, #calls do
+    local cycle = visit(calls[i], visited, dist)
+    if cycle then cycle[dist] = future return cycle end
+  end
+  visited[future] = nil
+end
+local function find_cycle()
+  local visited = {}
+  for i = 1, #roots do
+    local cycle = visit(roots[i], visited, 0)
+    if cycle then return cycle end
+  end
 end
 
 ------------------------------------------------------------------------------
@@ -80,7 +69,7 @@ Task.__call = diagnostics.trace(
   '[task] running ${self} ${arg}',
   '[task] finished ${self} ${arg}',
   function(self, arg, extra)
-    local future = get_or_start(self, arg, extra)
+    local future = self:async(arg, extra)
     local ok, res = await(future)
     if not ok then
       res:report()
@@ -91,6 +80,45 @@ Task.__call = diagnostics.trace(
 function Task.__tostring(task)
   local prefix = tostring(task.ns)
   return prefix..(prefix == '' and '' or '.')..task.name
+end
+
+local function get_or_start(self, arg, extra)
+  local futures = self.futures
+  local future = futures[arg or 1]
+  if future then return future end -- already started
+  -- check if the task was called correctly
+  local ns = self.ns
+  if arg == ns then
+    error('task must be called as .function() not :method()', 4)
+  end
+  if extra ~= nil then error('tasks can only take one argument', 4) end
+  -- start the task
+  future = async(self.f, arg)
+  future.task = self
+  future.calls = {} -- list of calls to other task futures
+  futures[arg or 1] = future
+  return future
+end
+
+local function format_cycle(d)
+  local path = d.cycle
+  local msg = tostring(path[1].task)
+  for i = 2, #path do
+    msg = msg .. ' -> ' .. tostring(path[i].task)
+  end
+  return msg
+end
+
+function Task:async(arg, extra)
+  local future = get_or_start(self, arg, extra)
+  local calling_future = async_get()
+  local calling_task = calling_future.task
+  on_call(calling_future, calling_task, future, self)
+  if future:is_running() then -- this is a cycle
+    diagnostics.new{'fatal: cycle detected in tasks: ${format_cycle}',
+      cycle = find_cycle(), format_cycle = format_cycle}:set_location(3):report()
+  end
+  return future
 end
 
 function Task:get_results(arg)
@@ -114,6 +142,36 @@ local function new_task(ns, name, f)
     error('tasks must be declared as .functions() not :methods()', 3)
   end
   return setmetatable({ns = ns, name = name, f = f, futures = {false}}, Task)
+end
+
+------------------------------------------------------------------------------
+-- TaskList object (callable list of tasks)
+------------------------------------------------------------------------------
+
+local TaskList = {}
+
+TaskList.__call = diagnostics.trace(
+  '[task] running ${self} ${arg}',
+  '[task] finished ${self} ${arg}',
+  function(self, arg, extra)
+    local t = {}
+    for i = 1, #self do
+      t[i] = self[i]:async(arg, extra)
+    end
+    local ok, err = wait_all(t)
+    if not ok then
+      if #err.nested == 1 then err = err.nested[1] end
+      err:report()
+    end
+  end)
+
+function TaskList:__tostring()
+  local t = {}
+  for i = 1, #self do
+    t[i] = tostring(self[i])
+  end
+  tbl_sort(t)
+  return 'task list {'..tbl_concat(t, ', ')..'}'
 end
 
 ------------------------------------------------------------------------------
@@ -189,6 +247,10 @@ function Namespace:reset(args)
   self.tasks = {}
   self.nested = {}
 end
+
+-- internal symbols:
+Namespace._Task = Task
+function Namespace._get_roots() return roots end
 
 -- return root task namespace
 return new_namespace('')

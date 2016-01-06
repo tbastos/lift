@@ -1,5 +1,9 @@
 local task = require 'lift.task'
 
-function task:default(...)
-  return 42, ...
+function task.passthrough(...)
+  return ...
+end
+
+function task.default()
+  return task.passthrough(42)
 end

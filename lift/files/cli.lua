@@ -17,13 +17,13 @@ app:flag 'color'
   :action(function(option, value) color.set_enabled(value) end)
 
 local quiet = app:flag 'quiet'
-  :desc('--quiet', 'Only print warnings and errors')
+  :desc('--quiet', 'Suppress messages (prints warnings and errors)')
   :action(function(option, value)
       diagnostics.levels.remark = value and 'ignored' or 'remark'
     end)
 
 app:flag 'silent'
-  :desc('--silent', 'Only print errors')
+  :desc('--silent', 'Suppress messages (prints errors)')
   :action(function(option, value)
       quiet(value) -- implies -quiet
       diagnostics.levels.remark = value and 'ignored' or 'remark'

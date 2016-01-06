@@ -101,7 +101,7 @@ describe("A lift.task", function()
       task.add_arg(2)
       assert.equal(5, v)
       assert.error_match(function() task:add_two() end,
-        "tasks must be called as %.functions%(%) not :methods%(%)")
+        "task must be called as %.function%(%) not :method%(%)")
       assert.error_match(function() task.add_arg(4, 2) end,
         "tasks can only take one argument")
     end))
@@ -123,6 +123,14 @@ describe("A lift.task", function()
       assert.Nil(r4)
       assert.falsy(task.args:get_results())
       assert.same(list, task.args:get_results(list))
+    end))
+
+    it("cannot form cycles", su.async(function()
+      function task.a() return task.b() end
+      function task.b() return task.c() end
+      function task.c() return task.a() end
+      assert.error_match(function() task.a() end,
+        "cycle detected in tasks: a %-> b %-> c %-> a")
     end))
 
   end)

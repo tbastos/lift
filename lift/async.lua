@@ -134,9 +134,15 @@ function Future:check_error()
   if err then error(err) end
 end
 
+-- Returns whether the future's thread is currently running.
+function Future:is_running()
+  return self.status == false
+end
+
 -- Called by coroutines to execute a new future.
 on_begin = diagnostics.trace('[thread] ${future} started',
   function(future)
+    future.status = false -- the future's thread is running
     return {future.f(future.arg)}
   end)
 
@@ -207,7 +213,7 @@ end
 -- Returns a future object for interfacing with the async call.
 local function async(f, arg)
   local future = setmetatable({f = f, arg = arg, co = false,
-    error = false, results = false, status = false}, Future)
+    error = false, results = false, status = nil}, Future)
   resumable[future] = future
   return future
 end

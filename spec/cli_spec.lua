@@ -1,8 +1,8 @@
 describe('lift.cli', function()
 
+  local su = require 'spec.util'
   local cli = require 'lift.cli'
   local config = require 'lift.config'
-  local loader = require 'lift.loader'
   local diagnostics = require 'lift.diagnostics'
 
   local root, verifier
@@ -209,53 +209,31 @@ describe('lift.cli', function()
     assert.error(function() root:option'o' end, "redefinition of option 'o'")
   end)
 
+  local sh = require'lift.os'.sh
+  local function run_lift(args)
+    return sh('./bin/lift '..args)
+  end
+
   describe("default root command", function()
-    local exit = os.exit
-    before_each(function()
-      os.exit = function() error('os.exit') end -- luacheck: ignore
-    end)
-    after_each(function()
-      os.exit = exit -- luacheck: ignore
-    end)
-
-    it("implements --help", function()
-      local _, out = diagnostics.capture(function()
-        root:process{'--help'}
-      end)
+    it("implements --help", su.async(function()
+      local out = run_lift '--help'
       assert.match("Use 'lift help <command>' to read about a subcommand", out)
-    end)
-
-    it("implements help command", function()
-      local _, out = diagnostics.capture(function()
-        root:process{'help help'}
-      end)
-      assert.match("^Usage:.* help .* Print help for one command and exit", out)
-    end)
-
-    it("implements --version", function()
-      local _, out = diagnostics.capture(function()
-        root:process{'--version'}
-      end)
+    end))
+    it("implements help command", su.async(function()
+      local out = run_lift 'help help'
+      assert.match("Usage:.*Print help for one command and exit\n", out)
+    end))
+    it("implements --version", su.async(function()
+      local out = run_lift '--version'
       assert.equal(config.LIFT_VERSION, out)
-    end)
-
+    end))
   end)
 
   describe("default cli", function()
-
-    before_each(function()
-      config.load_path = config.LIFT_SRC_DIR..'/files'
-      loader.load_all('cli', nil, root)
-    end)
-
-    it("implements 'config list'", function()
-      local ok, out = diagnostics.capture(function()
-        root:process{'my_var=1', '--color=no', 'config', 'list', 'my_var'}
-      end)
-      assert.True(ok)
+    it("implements 'config list'", su.async(function()
+      local out = run_lift 'my_var=1 --color=no config list my_var'
       assert.equal('\n-- from cli\nmy_var = "1"\n', out)
-    end)
-
+    end))
   end)
 
 end)
