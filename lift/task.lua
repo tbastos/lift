@@ -111,9 +111,9 @@ end
 
 function Task:async(arg, extra)
   local future = get_or_start(self, arg, extra)
-  local calling_future = async_get()
-  local calling_task = calling_future.task
-  on_call(calling_future, calling_task, future, self)
+  local running_future = async_get()
+  local running_task = running_future.task
+  on_call(running_future, running_task, future, self)
   if future:is_running() then -- this is a cycle
     diagnostics.new{'fatal: cycle detected in tasks: ${format_cycle}',
       cycle = find_cycle(), format_cycle = format_cycle}:set_location(3):report()

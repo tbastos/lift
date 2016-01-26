@@ -209,28 +209,24 @@ describe('lift.cli', function()
     assert.error(function() root:option'o' end, "redefinition of option 'o'")
   end)
 
-  -- local sh = require'lift.os'.sh
-  -- local function run_lift(args)
-  --   return sh('./bin/lift '..args)
-  -- end
+  local sh = require'lift.os'.sh
+  local function run_lift(args)
+    return sh('./bin/lift '..args)
+  end
 
-  -- describe("default cli", function()
-  --   it("implements --help", su.async(function()
-  --     local out = run_lift '--help'
-  --     assert.match("Use 'lift help <command>' to read about a subcommand", out)
-  --   end))
-  --   it("implements help command", su.async(function()
-  --     local out = run_lift 'help help'
-  --     assert.match("Usage:.*Print help for one command and exit\n", out)
-  --   end))
-  --   it("implements --version", su.async(function()
-  --     local out = run_lift '--version'
-  --     assert.equal(config.LIFT_VERSION, out)
-  --   end))
-  --   it("implements 'config list'", su.async(function()
-  --     local out = run_lift 'my_var=1 --color=no config list my_var'
-  --     assert.equal('\n-- from cli\nmy_var = "1"\n', out)
-  --   end))
-  -- end)
+  describe("default cli", function()
+    it("implements --help", su.async(function()
+      local out = run_lift '--help'
+      assert.match("Use 'lift help <command>' to read about a subcommand", out)
+    end))
+    it("implements --version", su.async(function()
+      local out = run_lift '--version'
+      assert.equal(config.LIFT_VERSION, out)
+    end))
+    it("implements 'config list'", su.async(function()
+      local out = run_lift 'my_var=1 --color=no config list my_var'
+      assert.equal('\n-- from cli\nmy_var = "1"\n', out)
+    end))
+  end)
 
 end)

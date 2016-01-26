@@ -57,7 +57,9 @@ end
 -- Must be called from within a coroutine created by this module.
 local function co_get()
   local co = co_running()
-  return assert(coroutines[co], 'not in a lift.async coroutine'), co
+  local future = coroutines[co]
+  if not future then error('not in a lift.async coroutine', 2) end
+  return future, co
 end
 
 ------------------------------------------------------------------------------
@@ -254,8 +256,8 @@ local function wait(future, timeout)
     if status == 'failed' then return false, future.error end
     return true, future.results
   end
-  local this_future = co_get()
-  if future == this_future then error('future cannot wait for itself', 2) end
+  local running = co_get()
+  if future == running then error('future cannot wait for itself', 2) end
   local res, err, cb
   if timeout then
     local timer = uv_new_timer()
@@ -263,7 +265,7 @@ local function wait(future, timeout)
         if timer == nil then return false end -- ignore second call
         if _future then res, err = _res, _err
         else res, err = false, 'timed out' end
-        resume_soon(this_future)
+        resume_soon(running)
         uv_close(timer)
         timer = nil
         return true
@@ -272,7 +274,7 @@ local function wait(future, timeout)
   else
     cb = function(_, _err, _res)
         err, res = _err, _res
-        resume_soon(this_future)
+        resume_soon(running)
         return true
       end
   end
@@ -289,10 +291,10 @@ end
 -- Either returns the first fulfilled future, or nil and the first error.
 local function wait_any(futures)
   -- first we check if any future is currently ready
-  local n, this_future = #futures, co_get()
+  local n, running = #futures, co_get()
   for i = 1, n do
     local f = futures[i]
-    if f == this_future then error('future cannot wait for itself', 2) end
+    if f == running then error('future cannot wait for itself', 2) end
     local status = f.status
     if status then -- future is ready
       if status == 'failed' then return nil, f.error end
@@ -304,7 +306,7 @@ local function wait_any(futures)
     if first then return false end
     first = future
     first_err = err
-    resume_soon(this_future)
+    resume_soon(running)
     return true
   end
   for i = 1, n do
@@ -322,19 +324,19 @@ end
 -- Returns true when all futures are fulfilled, or false and a diagnostic
 -- object when errors occur. The diagnostic aggregates all raised errors.
 local function wait_all(futures)
-  local n, errors, this_future = #futures, nil, co_get()
+  local n, errors, running = #futures, nil, co_get()
   local function callback(future, err, res)
     if err then
       if not errors then errors = {err} else errors [#errors+1] = err end
       err.future = future -- keep track of which future raised the error
     end
     n = n - 1
-    if n == 0 then resume_soon(this_future) end
+    if n == 0 then resume_soon(running) end
     return true
   end
   for i = 1, n do
     local f = futures[i]
-    if f == this_future then error('future cannot wait for itself', 2) end
+    if f == running then error('future cannot wait for itself', 2) end
     f:on_ready(callback)
   end
   if n > 0 then co_yield() end
@@ -346,10 +348,10 @@ end
 -- Suspends the calling thread until `dt` milliseconds have passed.
 -- Returns the elapsed time spent sleeping, in milliseconds.
 local function sleep(dt)
-  local timer, this_future = uv_new_timer(), co_get()
+  local timer, running = uv_new_timer(), co_get()
   uv_timer_start(timer, dt, 0, function()
     uv_close(timer)
-    resume_soon(this_future)
+    resume_soon(running)
   end)
   local t0 = uv_now()
   co_yield()

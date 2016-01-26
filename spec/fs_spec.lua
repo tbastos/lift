@@ -1,6 +1,8 @@
 describe('lift.fs', function()
 
   local fs = require 'lift.fs'
+  local stream = require 'lift.stream'
+  local su = require 'spec.util'
 
   it('offers is_dir() to test if a directory exists', function()
     assert.False(fs.is_dir'nothing', fs.is_dir'README.md')
@@ -124,6 +126,77 @@ describe('lift.fs', function()
       assert.is_string(fs.glob('${PATH}/lua*')())
     end)
 
+  end)
+
+  -- helper to test file streams
+  local function read_file(path)
+    local f = assert(io.open(path, 'r'))
+    local contents = f:read'*a'
+    f:close()
+    return contents
+  end
+
+  describe("readable file stream", function()
+
+    local LICENSE = read_file('LICENSE')
+    assert.is_string(LICENSE)
+    assert.True(#LICENSE > 100 and #LICENSE < 8000)
+
+    it("can read from a file (in one chunk)", su.async(function()
+      local out = {}
+      local to_out = stream.to_array(out)
+      fs.read_from('LICENSE'):pipe(to_out):wait_finish()
+      assert.same({LICENSE}, out)
+    end))
+
+    it("can read from a file (in many chunks)", su.async(function()
+      local out = {}
+      local to_out = stream.to_array(out, 20) -- with 50ms delay
+      to_out.high_water = 3 -- forces readable to buffer
+      local readable = fs.read_from('LICENSE', 100)
+      readable.high_water = 3 -- forces reader to pause
+      readable:pipe(to_out):wait_finish()
+      assert.True(#out > 10) -- out should contain 11 chunks
+      assert.equal(LICENSE, table.concat(out))
+    end))
+
+    it("push error if trying to read from inaccessible file", su.async(function()
+      local out = {}
+      local to_out = stream.to_array(out)
+      local readable = fs.read_from('non_existing')
+      assert.falsy(readable.read_error)
+      assert.falsy(to_out.write_error)
+      readable:pipe(to_out):wait_finish()
+      assert.truthy(readable.read_error)
+      assert.truthy(to_out.write_error)
+      assert.equal('ENOENT: no such file or directory: non_existing',
+        to_out.write_error.uv_err)
+    end))
+  end)
+
+  describe("writable file stream", function()
+    it("can write a string to a file", su.async(function()
+      local sb = {'Hello world!\n'}
+      local from_sb = stream.from_array(sb)
+      from_sb:pipe(fs.write_to('tmp_hello')):wait_finish()
+      assert.equal('Hello world!\n', read_file('tmp_hello'))
+      fs.unlink('tmp_hello')
+    end))
+
+    it("can write a string buffer to a file", su.async(function()
+      local sb = {'Hello ', 'world!', '\nFrom string buffer\n'}
+      local from_sb = stream.from_array(sb)
+      from_sb:pipe(fs.write_to('tmp_hello')):wait_finish()
+      assert.equal('Hello world!\nFrom string buffer\n', read_file('tmp_hello'))
+      fs.unlink('tmp_hello')
+    end))
+
+    it("can write a copy of a readable file", su.async(function()
+      local path = 'LICENSE'
+      fs.read_from(path):pipe(fs.write_to('tmp_copy')):wait_finish()
+      assert.equal(read_file(path), read_file('tmp_copy'))
+      fs.unlink('tmp_copy')
+    end))
   end)
 
 end)

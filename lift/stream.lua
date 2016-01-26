@@ -226,6 +226,7 @@ Readable.push = diagnostics.trace(
     if self.flowing then -- just send the data now
       send_data(self, data, err)
       if data == nil then
+        self.read_error = err or false
         send_readable(self) -- in flowing mode, only send 'readable' at the end
         send_end(self)
         return false
