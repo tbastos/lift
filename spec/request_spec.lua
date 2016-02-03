@@ -33,6 +33,7 @@ describe('lift.request', function()
     assert.equal('</html>', html:sub(-7))
     -- parse Google's logo URL
     local logo_path = html:match('background:url%(([^)]-googlelogo[^)]*)%)')
+    assert.is_string(logo_path)
     -- download the PNG
     local sb2 = {}
     req('www.google.com'..logo_path):pipe(stream.to_array(sb2)):wait_finish()
