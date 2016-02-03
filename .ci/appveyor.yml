@@ -22,8 +22,8 @@ cache:
   - c:\lua -> .ci\appveyor.yml
   - c:\external -> .ci\appveyor.yml
 
-init:
-  - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+# init:
+#   - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
 
 install:
   - call .ci\set_compiler_env.bat
@@ -33,7 +33,7 @@ build_script:
   - luarocks install lpeg
   - luarocks install luv
   - luarocks install busted
-  - busted -v
+  - busted -o tap -v
   - luarocks make
   - lift --help
 
