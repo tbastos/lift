@@ -159,10 +159,11 @@ function Readable:on_end(callback)
 end
 
 function Readable:wait_end()
-  if self:has_ended() then return end
+  if self:has_ended() then return self end
   local this_future = async_get()
   self:on_end(function() async_resume(this_future) end)
   co_yield()
+  return self
 end
 
 function Readable:has_ended()
@@ -294,7 +295,7 @@ Readable.pipe = diagnostics.trace(
       local n = self.waiting - 1 ; self.waiting = n
       if n == 0 then self:start() end
     end
-    self:on_data(function(stream, data, err)
+    self:on_data(function(self, data, err) -- luacheck: ignore
       if data ~= nil or err ~= nil or not keep_open then
         if not writable:write(data, err) and data ~= nil then
           self.waiting = self.waiting + 1
@@ -345,10 +346,11 @@ function Writable:on_finish(callback)
 end
 
 function Writable:wait_finish()
-  if self:has_finished() then return end
+  if self:has_finished() then return self end
   local this_future = async_get()
   self:on_finish(function() async_resume(this_future) end)
   co_yield()
+  return self
 end
 
 function Writable:has_finished()
@@ -439,7 +441,7 @@ local function new_writable(writer, write_many, id)
 end
 
 ------------------------------------------------------------------------------
--- Duplex stream
+-- Duplex stream (a stream that is both readable and writable)
 ------------------------------------------------------------------------------
 
 local Duplex = {}
@@ -451,7 +453,7 @@ local function new_duplex(reader, writer, write_many, id)
 end
 
 ------------------------------------------------------------------------------
--- Inheritance
+-- Stream class inheritance
 ------------------------------------------------------------------------------
 
 local function inherit_from(child, parent)
@@ -469,6 +471,33 @@ inherit_from(Readable, Stream)
 inherit_from(Writable, Stream)
 
 ------------------------------------------------------------------------------
+-- Transform stream (duplex stream where the output is derived from the input)
+------------------------------------------------------------------------------
+
+local function new_transform(transform, id)
+  local function reader(self)
+    -- nothing to do here... we must wait for writes
+  end
+  local function writer(self, data, err, callback)
+    -- TODO implement flow control
+    transform(self, data, err, callback)
+  end
+  return new_duplex(reader, writer, nil, id)
+end
+
+------------------------------------------------------------------------------
+-- Pass-Through stream
+------------------------------------------------------------------------------
+
+local function passthrough(self, data, err, callback)
+  self:push(data, err)
+end
+
+local function new_passthrough()
+  return new_transform(passthrough, 'passthrough')
+end
+
+------------------------------------------------------------------------------
 -- Array Streams (test helpers)
 ------------------------------------------------------------------------------
 
@@ -483,7 +512,7 @@ local function from_array(t, delay)
   local i, n, reader = 1, #t
   if delay then -- async reader
     local reading = false
-    reader = function(stream)
+    reader = function(self)
       if reading then return end
       reading = true
       async(function()
@@ -492,7 +521,7 @@ local function from_array(t, delay)
           if i <= n then
             data, i = t[i], i + 1
           end
-          if not stream:push(data) then
+          if not self:push(data) then
             reading = false
             return
           end
@@ -501,12 +530,12 @@ local function from_array(t, delay)
       end)
     end
   else -- sync reader
-    reader = function(stream)
+    reader = function(self)
       repeat
-        local more = stream:push(t[i])
+        local more = self:push(t[i])
         i = i + 1
       until i > n or not more
-      if i > n then stream:push() end
+      if i > n then self:push() end
     end
   end
   return new_readable(reader, array_id(t, delay))
@@ -516,7 +545,7 @@ end
 -- writer works asynchronously, writing a chunk every `delay` milliseconds.
 local function to_array(t, delay)
   local size = 1
-  local function sync_writer(stream, data, err, callback)
+  local function sync_writer(self, data, err, callback)
     if data == nil then return callback(err) end
     t[size] = data
     size = size + 1
@@ -524,10 +553,10 @@ local function to_array(t, delay)
   end
   local writer = sync_writer
   if delay then -- async writer
-    writer = function(stream, data, err, callback)
+    writer = function(self, data, err, callback)
       async(function()
         async.sleep(delay)
-        sync_writer(stream, data, err, callback)
+        sync_writer(self, data, err, callback)
       end)
     end
   end
@@ -551,9 +580,9 @@ local function create_uv_reader(handle)
       uv_read_stop(handle)
     end
   end
-  local function reader(stream)
+  local function reader(self)
     if not dest_stream then
-      dest_stream = stream
+      dest_stream = self
       uv_read_start(handle, on_read)
     end
   end
@@ -562,7 +591,7 @@ end
 
 -- Creates writer and write_many functions for an uv stream.
 local function create_uv_writers(handle)
-  local function writer(stream, data, err, callback)
+  local function writer(self, data, err, callback)
     if err then return callback(err) end
     if data then
       uv_write(handle, data, callback)
@@ -570,7 +599,7 @@ local function create_uv_writers(handle)
       uv_shutdown(handle, callback)
     end
   end
-  local function write_many(stream, chunks, callback)
+  local function write_many(self, chunks, callback)
     uv_write(handle, chunks, callback)
   end
   return writer, write_many
@@ -603,7 +632,9 @@ return {
   from_uv = from_uv,
   new_duplex = new_duplex,
   new_duplex_uv = new_duplex_uv,
+  new_passthrough = new_passthrough,
   new_readable = new_readable,
+  new_transform = new_transform,
   new_writable = new_writable,
   to_array = to_array,
   to_uv = to_uv,

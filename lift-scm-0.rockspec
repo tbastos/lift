@@ -15,7 +15,7 @@ description = {
 dependencies = {
   'lua >= 5.1', -- actually 5.2 and LuaJIT, but LuaJIT self-identifies as 5.1
   'lpeg >= 1.0.0',
-  'luv >= 1.7.4',
+  'luv >= 1.8.0-1',
 }
 
 build = {
@@ -31,6 +31,7 @@ build = {
     ["lift.loader"] = "lift/loader.lua",
     ["lift.os"] = "lift/os.lua",
     ["lift.path"] = "lift/path.lua",
+    ["lift.request"] = "lift/request.lua",
     ["lift.string"] = "lift/string.lua",
     ["lift.task"] = "lift/task.lua",
     ["lift.template"] = "lift/template.lua",

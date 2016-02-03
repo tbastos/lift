@@ -80,6 +80,42 @@ describe('lift.stream', function()
     end))
   end)
 
+  describe("passthrough stream", function()
+    local input = {'str', 3.14, {x = 1}, true, false}
+    for i = 1, 20 do input[#input+1] = i end
+
+    it("forwards all data (sync)", su.async(function()
+      local out = {}
+      local to_out = stream.to_array(out)
+      local from_in = stream.from_array(input)
+      local pass1 = stream.new_passthrough()
+      local pass2 = stream.new_passthrough()
+      from_in:pipe(pass1):pipe(pass2):pipe(to_out):wait_finish()
+      assert.same(input, out)
+    end))
+
+    it("forwards all data (async, slow input)", su.async(function()
+      local out = {}
+      local to_out = stream.to_array(out)
+      local from_in = stream.from_array(input, 20) -- slow input
+      local pass1 = stream.new_passthrough()
+      local pass2 = stream.new_passthrough()
+      from_in:pipe(pass1):pipe(pass2):pipe(to_out):wait_finish()
+      assert.same(input, out)
+    end))
+
+    it("forwards all data (async, slow output)", su.async(function()
+      local out = {}
+      local to_out = stream.to_array(out, 20) -- slow output
+      local from_in = stream.from_array(input)
+      local pass1 = stream.new_passthrough()
+      local pass2 = stream.new_passthrough()
+      from_in:pipe(pass1):pipe(pass2):pipe(to_out):wait_finish()
+      assert.same(input, out)
+    end))
+
+  end)
+
   describe("uv streams", function()
     local uv = require 'luv'
 

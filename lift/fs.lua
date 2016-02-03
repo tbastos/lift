@@ -87,12 +87,7 @@ local function rmdir(path) return uv_rmdir(from_slash(path)) end
 -- Returns an iterator function/object so that the construction
 --   for name in fs.scandir(path) do ... end
 -- will iterate over the directory entries in `path`.
-local function _scandir_next(dir_req)
-  local t = uv_scandir_next(dir_req) -- TODO this shouldn't return a table
-  if not t then return end
-  return t.name, t.type
-end
-local function scandir(path) return _scandir_next, uv_scandir(from_slash(path)) end
+local function scandir(path) return uv_scandir_next, uv_scandir(from_slash(path)) end
 
 -- Returns a table containing information about the file pointed to by `path`.
 -- Available fields: dev, mode, nlink, uid, gid, rdev, ino, size, blksize,
@@ -298,25 +293,27 @@ end
 -- File I/O Streams
 ------------------------------------------------------------------------------
 
-local default_permissions = tonumber('664', 8)
+local default_permission = tonumber('664', 8)
 
-local function push_error(s, err)
-  s:push(nil, diagnostics.new{'error: ${uv_err}', stream = s, uv_err = err})
+local function push_error(self, err)
+  self:push(nil, diagnostics.new{'error: ${uv_err}', stream = self, uv_err = err})
 end
 
+-- Creates a readable stream that reads the file specified by `path` in
+-- blocks of `bufsize` bytes (optional, defaults to 16KB).
 local function read_from(path, bufsize)
   bufsize = bufsize or 16384 -- read in 16KB blocks by default
   local reading = false
-  local file, s, read_more
+  local file, self, read_more
   local function read_cb(err, chunk)
-    if err then return push_error(s, err) end
+    if err then return push_error(self, err) end
     if chunk == '' then
       uv_fclose(file, function(err) -- luacheck: ignore
-        if err then return push_error(s, err) end
-        s:push()
+        if err then return push_error(self, err) end
+        self:push()
       end)
     else
-      if s:push(chunk) then
+      if self:push(chunk) then
         read_more()
       else
         reading = false
@@ -332,9 +329,9 @@ local function read_from(path, bufsize)
     if file then
       read_more()
     else
-      s = _stream
-      uv_fopen(path, 'r', default_permissions, function(err, fd)
-        if err then return push_error(s, err) end
+      self = _stream
+      uv_fopen(path, 'r', default_permission, function(err, fd)
+        if err then return push_error(self, err) end
         file = fd
         read_more()
       end)
@@ -343,27 +340,27 @@ local function read_from(path, bufsize)
   return stream.new_readable(reader, 'file '..path)
 end
 
+-- Writes a stream to the file specified by `path`.
 local function write_to(path)
   local file
-  local function writer(s, data, err, callback)
-    if err then return callback(err) end
+  local function writer(self, data, err, callback)
     if data then
       if file then
         uv_fwrite(file, data, -1, callback)
       else
-        uv_fopen(path, 'w', default_permissions, function(e, fd)
+        uv_fopen(path, 'w', default_permission, function(e, fd)
           if e then return callback(e) end
           file = fd
           uv_fwrite(file, data, -1, callback)
         end)
       end
-    else
-      assert(file)
+    elseif file then
       uv_fclose(file, callback)
       file = nil
     end
+    if err then callback(err) end
   end
-  local function write_many(s, chunks, callback)
+  local function write_many(self, chunks, callback)
     assert(file)
     uv_fwrite(file, chunks, -1, callback)
   end
