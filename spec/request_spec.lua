@@ -21,8 +21,7 @@ describe('lift.request', function()
   it("pushes errors onto the stream", su.async(function()
     assert.no_error(try_get('www.google.com/invalid_url'))
     assert.error_matches(try_get('-s www.google.com'), 'malformed URL')
-    assert.error_matches(try_get('invalid.url'),
-      'Could not resolve host: invalid.url')
+    assert.error_matches(try_get('invalid.url'), 't resolve host')
     assert.error_matches(try_get('weird://protocol.com'),
       'Protocol "weird" not supported or disabled in libcurl')
   end))
