@@ -23,7 +23,7 @@ describe('lift.request', function()
     assert.error_matches(try_get('-s www.google.com'), 'malformed URL')
     assert.error_matches(try_get('invalid.url'), 't resolve host')
     assert.error_matches(try_get('weird://protocol.com'),
-      'Protocol "weird" not supported or disabled in libcurl')
+      'Protocol .- not supported')
   end))
 
   it("can fetch a PNG image (Google's logo)", su.async(function()
