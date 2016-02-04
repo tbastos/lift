@@ -1,6 +1,7 @@
 describe('lift.cli', function()
 
   local cli = require 'lift.cli'
+  local path = require 'lift.path'
   local config = require 'lift.config'
   local diagnostics = require 'lift.diagnostics'
   local su = require 'spec.util'
@@ -211,7 +212,7 @@ describe('lift.cli', function()
 
   local sh = require'lift.os'.sh
   local function run_lift(args)
-    return sh('./bin/lift '..args)
+    return sh(path.from_slash('./bin/lift ')..args)
   end
 
   describe("default cli", function()

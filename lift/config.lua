@@ -204,5 +204,6 @@ config.set_const('APP_VERSION', '0.1.0')
 config.set_const('LIFT_VERSION', config.APP_VERSION)
 config.set_const('LIFT_SRC_DIR',
   path.abs(path.dir(path.to_slash(debug.getinfo(1, "S").source:sub(2)))))
+config.set_const('LUA_EXE_PATH', require'luv'.exepath())
 
 return config

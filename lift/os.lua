@@ -10,12 +10,28 @@ local async = require 'lift.async'
 local async_get, async_resume = async._get, async._resume
 local stream = require 'lift.stream'
 local from_uv, to_uv = stream.from_uv, stream.to_uv
+local fs = require 'lift.fs'
 local util = require 'lift.util'
 local UNIX, WINDOWS = util._UNIX, util._WINDOWS
 local uv = require 'luv'
 local uv_new_pipe, uv_read_start = uv.new_pipe, uv.read_start
 local uv_new_timer, uv_timer_start  = uv.new_timer, uv.timer_start
 local uv_close, uv_process_kill, uv_spawn = uv.close, uv.process_kill, uv.spawn
+
+------------------------------------------------------------------------------
+-- Find an installed program file in a portable way
+------------------------------------------------------------------------------
+
+local config = require 'lift.config'
+local extensions = config:get_list('PATHEXT', true)
+if #extensions == 0 then extensions[1] = '' end
+config.program_file_extensions = extensions
+
+local function find_program(name)
+  local path = fs.glob('${PATH}/'..name..'${program_file_extensions}')()
+  if path then return path end
+  return nil, "could not find program '"..name.."' in the system"
+end
 
 ------------------------------------------------------------------------------
 -- ChildProcess objects and spawn()
@@ -195,6 +211,7 @@ end
 return {
   UNIX = UNIX,
   WINDOWS = WINDOWS,
+  find_program = find_program,
   sh = sh,
   spawn = spawn,
 }

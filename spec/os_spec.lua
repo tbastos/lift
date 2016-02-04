@@ -1,7 +1,9 @@
 describe('lift.os', function()
 
   local os = require 'lift.os'
+  local ls = require 'lift.string'
   local async = require 'lift.async'
+  local config = require 'lift.config'
   local su = require 'spec.util'
 
   it('offers sh() to execute a shell command', su.async(function()
@@ -21,7 +23,7 @@ describe('lift.os', function()
   describe("child processes", function()
 
     it("can be started with spawn()", su.async(function()
-      local c = assert(os.spawn{file = 'echo', 'Spawn',
+      local c = assert(os.spawn{file = config.LUA_EXE_PATH, '-e', 'print [[Spawn]]',
         stdin = 'ignore', stdout = 'ignore', stderr = 'ignore'})
       assert.is_number(c.pid)
       assert.is_nil(c.status)
@@ -38,14 +40,14 @@ describe('lift.os', function()
       assert.is_nil(c.signal)
       c:kill()
       async.sleep(100)
-      assert.equal(0, c.status)
       assert.equal(15, c.signal) -- sigterm
       assert.error(function() c:kill() end,
         'process:kill() called after process termination')
     end))
 
     it("can inherit fds from parent and be waited for", su.async(function()
-      local c = assert(os.spawn{file = 'echo', '\nHello from child process',
+      local c = assert(os.spawn{file = config.LUA_EXE_PATH,
+        '-e', 'print[[\n\nHello from child process]]',
         stdin = 'ignore', stdout = 'inherit', stderr = 'inherit'})
       assert.Nil(c.status)
       c:wait()
@@ -54,7 +56,8 @@ describe('lift.os', function()
 
     it("can be waited for with a timeout", su.async(function()
       -- with enough time
-      local c = assert(os.spawn{file = 'echo', 'this is fast',
+      local c = assert(os.spawn{file = config.LUA_EXE_PATH,
+        '-e', 'print[[this is fast]]',
         stdin = 'ignore', stdout = 'ignore', stderr = 'ignore'})
       assert.Nil(c.status)
       local status, signal = c:wait(300)
@@ -70,11 +73,12 @@ describe('lift.os', function()
     end))
 
     it("can be read from (stdout, stderr)", su.async(function()
-      local c = assert(os.spawn{file = 'echo', 'Hello world', stdin = 'ignore'})
+      local c = assert(os.spawn{file = config.LUA_EXE_PATH,
+        '-e', 'print[[Hello world]]', stdin = 'ignore'})
       assert.Nil(c:try_read())
       assert.Nil(c.stderr:try_read())
       c:wait() -- await exit before reading
-      assert.equal('Hello world\n', c:try_read())
+      assert.equal('Hello world\n', ls.native_to_lf(c:try_read()))
       assert.Nil(c.stderr:try_read())
     end))
 
@@ -94,7 +98,7 @@ describe('lift.os', function()
       local c = assert(os.spawn{file = 'lua',
           '-e', 'io.stderr:write(io.read())', stdout = 'ignore'})
       c:write('Hello from stderr')
-      c:write() -- shuts down stdin, causing 'lua' to exit
+      c:write() -- shuts down stdin, causing the process to exit
       assert.Nil(c.stdout)
       assert.Nil(c.stderr:try_read())
       c:wait() -- await exit before reading
@@ -114,8 +118,10 @@ describe('lift.os', function()
     end))
 
     it("can be piped to another process", su.async(function()
-      local echo1 = assert(os.spawn{file = 'echo', '-n', 'OneTwoThree', stdin = 'ignore'})
-      local echo2 = assert(os.spawn{file = 'echo', '-n', 'FourFive', stdin = 'ignore'})
+      local echo1 = assert(os.spawn{file = config.LUA_EXE_PATH,
+        '-e', 'io.write[[OneTwoThree]]', stdin = 'ignore'})
+      local echo2 = assert(os.spawn{file = config.LUA_EXE_PATH,
+        '-e', 'io.write[[FourFive]]', stdin = 'ignore'})
       local cat1 = assert(os.spawn{file = 'cat'})
       local cat2 = assert(os.spawn{file = 'cat'})
       echo1:pipe(cat1, true) -- pipe to cat1 and keep cat1 open

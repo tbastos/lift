@@ -5,18 +5,17 @@
 -- Inspired by https://github.com/request/request
 
 local assert = assert
-local fs = require 'lift.fs'
 local stream = require 'lift.stream'
 
 local os = require 'lift.os'
 local spawn = os.spawn
 
 -- HTTP(S) GET request.
-local curl_program = assert(fs.glob('${PATH}/curl')())
+local curl_path = assert(os.find_program('curl'))
 local function noop() end
 local function get(url)
   if url:sub(1, 1) == '-' then error('malformed URL', 2) end
-  local cp = assert(spawn{file = curl_program, '-sS', '-L', url, stdin = 'ignore'})
+  local cp = assert(spawn{file = curl_path, '-sS', '-L', url, stdin = 'ignore'})
   local s = stream.new_readable(noop, 'request.get('..url..')')
   local e -- gathers any error received via either stderr or stdout
   local waiting = 2

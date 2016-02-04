@@ -81,11 +81,11 @@ end
 ------------------------------------------------------------------------------
 
 local function lf_to_crlf(text)
-  str_gsub(text, '\n', '\r\n')
+  return str_gsub(text, '\n', '\r\n')
 end
 
 local function crlf_to_lf(text)
-  str_gsub(text, '\r\n', '\n')
+  return str_gsub(text, '\r\n', '\n')
 end
 
 local function native_to_lf(text)
