@@ -32,8 +32,10 @@ describe('lift.request', function()
     local html = table.concat(sb)
     assert.equal('</html>', html:sub(-7))
     -- parse Google's logo URL
-    local logo_path = html:match('background:url%(([^)]-googlelogo[^)]*)%)')
-    print('google.com', html, logo_path)
+    local logo_path = html:match([=[["'(]([^"'()]*googlelogo[^"'()]*%.png)["')]]=])
+    if not logo_path then
+      print('Failed to find googlelogo.png in page: ', html)
+    end
     assert.is_string(logo_path)
     -- download the PNG
     local sb2 = {}
