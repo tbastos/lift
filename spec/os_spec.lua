@@ -23,7 +23,7 @@ describe('lift.os', function()
   describe("child processes", function()
 
     it("can be started with spawn()", su.async(function()
-      local c = assert(os.spawn{file = config.LUA_EXE_PATH, '-e', 'print [[Spawn]]',
+      local c = assert(os.spawn{file = config.LUA_EXE_PATH, '-e', 'os.exit(0)',
         stdin = 'ignore', stdout = 'ignore', stderr = 'ignore'})
       assert.is_number(c.pid)
       assert.is_nil(c.status)
@@ -47,7 +47,7 @@ describe('lift.os', function()
 
     it("can inherit fds from parent and be waited for", su.async(function()
       local c = assert(os.spawn{file = config.LUA_EXE_PATH,
-        '-e', 'print[[\n\nHello from child process]]',
+        '-e', 'print[[Hello from child process]]',
         stdin = 'ignore', stdout = 'inherit', stderr = 'inherit'})
       assert.Nil(c.status)
       c:wait()
