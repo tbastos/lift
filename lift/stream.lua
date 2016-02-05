@@ -576,7 +576,7 @@ local function create_uv_reader(handle)
   local dest_stream
   local function on_read(err, data)
     if dest_stream:push(data, err) == false then
-      dest_stream = nil
+      dest_stream = 'ended'
       uv_read_stop(handle)
     end
   end

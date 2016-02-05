@@ -23,7 +23,7 @@ describe('lift.os', function()
   describe("child processes", function()
 
     it("can be started with spawn()", su.async(function()
-      local c = assert(os.spawn{file = config.LUA_EXE_PATH, '-e', 'os.exit(0)',
+      local c = assert(os.spawn{file = config.LUA_EXE_PATH, '-e', 'os.exit()',
         stdin = 'ignore', stdout = 'ignore', stderr = 'ignore'})
       assert.is_number(c.pid)
       assert.is_nil(c.status)
