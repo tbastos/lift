@@ -3,6 +3,7 @@
 ------------------------------------------------------------------------------
 
 local assert, getmetatable, setmetatable = assert, getmetatable, setmetatable
+local str_gsub = string.gsub
 local co_yield = coroutine.yield
 local diagnostics = require 'lift.diagnostics'
 local native_to_lf = require'lift.string'.native_to_lf
@@ -178,8 +179,8 @@ local function sh(command)
     async_resume(this_future)
   end
   local stdout, stderr = uv_new_pipe(false), uv_new_pipe(false)
-  local options = {UNIX and '-c' or '/C', command, -- args
-    stdio = {nil, stdout, stderr}, hide = true}
+  local options = {UNIX and '-c' or '/c', command, -- args
+    stdio = {nil, stdout, stderr}, hide = true, verbatim = true}
   options.args = options
   local proc, pid = uv_spawn(shell_program, options, on_exit)
   if not proc then
@@ -196,10 +197,16 @@ local function sh(command)
   uv_close(proc)
   so, se = native_to_lf(so), native_to_lf(se)
   if status ~= 0 or signal ~= 0 then
-    local what = (signal == 0 and 'failed' or 'interrupted')
-    return nil, diagnostics.new{'child_process_error: command ${what} '..
-      '(${status}/${signal}): ${stderr}', what = what, status = status,
-      signal = signal, stdout = so, stderr = se}
+    local what
+    if signal == 0 then
+      what = 'failed with status '..status
+    else
+      what = 'interrupted with signal '..signal
+    end
+    return nil, diagnostics.new{
+      'child_process_error: shell command ${what}: ${stderr}',
+      what = what, status = status, signal = signal, stdout = so,
+      stderr = se}:set_location(2)
   end
   return so, se
 end

@@ -7,8 +7,12 @@ describe('lift.os', function()
   local su = require 'spec.util'
 
   it('offers sh() to execute a shell command', su.async(function()
-    local out, err = assert(os.sh'echo Hello world!')
+    local out, err = assert(os.sh'echo Hello world!|cat')
     assert.equal('Hello world!\n', out)
+    assert.equal('', err)
+
+    out, err = assert(os.sh[[lua -e "io.write'Hello from stdout'"]])
+    assert.equal('Hello from stdout', out)
     assert.equal('', err)
 
     out, err = assert(os.sh[[lua -e "io.stderr:write'Hello from stderr'"]])
@@ -17,19 +21,20 @@ describe('lift.os', function()
 
     out, err = os.sh'invalid_cmd error'
     assert.Nil(out)
-    assert.match('command failed .* not found', err)
+    assert.match('shell command failed', err)
   end))
 
   describe("child processes", function()
 
     it("can be started with spawn()", su.async(function()
-      local c = assert(os.spawn{file = config.LUA_EXE_PATH, '-e', 'os.exit()',
+      local c = assert(os.spawn{file = config.LUA_EXE_PATH, '-e', 'os.exit(7)',
         stdin = 'ignore', stdout = 'ignore', stderr = 'ignore'})
       assert.is_number(c.pid)
       assert.is_nil(c.status)
       assert.is_nil(c.signal)
       async.sleep(100)
-      assert.equal(0, c.status, c.signal)
+      assert.equal(7, c.status)
+      assert.equal(0, c.signal)
     end))
 
     it("can be terminated with :kill()", su.async(function()
