@@ -134,9 +134,11 @@ describe('lift.os', function()
         '-e', 'io.write[[FourFive]]', stdin = 'ignore'})
       local cat1 = assert(os.spawn{file = 'cat'})
       local cat2 = assert(os.spawn{file = 'cat'})
-      echo1:pipe(cat1, true) -- pipe to cat1 and keep cat1 open
-      echo2:pipe(cat1) -- pipe to cat1 and shut down cat1
       cat1:pipe(cat2)
+      echo1:pipe(cat1, true) -- pipe to cat1 and keep cat1 open
+      echo1:wait()
+      echo2:pipe(cat1) -- pipe to cat1 and shut down cat1
+      echo2:wait()
       assert.equal('OneTwoThreeFourFive', cat2:read())
     end))
 
