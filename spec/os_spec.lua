@@ -100,7 +100,8 @@ describe('lift.os', function()
       assert.Nil(c.stdout:try_read())
       assert.Nil(c.stderr:try_read())
       c:wait() -- await exit before reading
-      local sb = {c:try_read(), c:try_read()}
+      local sb = {c:try_read()}
+      sb[#sb+1] = c:try_read()
       assert.equal('OneTwo', table.concat(sb))
       assert.Nil(c.stderr:try_read())
     end))
@@ -140,7 +141,8 @@ describe('lift.os', function()
       echo1.stdout:wait_end()
       echo2:pipe(cat1) -- pipe to cat1 and shut down cat1
       echo2.stdout:wait_end()
-      local sb = {cat2:read(), cat2:read()}
+      local sb = {cat2:read()}
+      sb[#sb+1] = cat2:read()
       assert.equal('OneTwoThreeFourFive', table.concat(sb))
     end))
 
