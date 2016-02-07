@@ -136,10 +136,11 @@ describe('lift.os', function()
       local cat2 = assert(os.spawn{file = 'cat'})
       cat1:pipe(cat2)
       echo1:pipe(cat1, true) -- pipe to cat1 and keep cat1 open
-      echo1:wait()
+      echo1.stdout:wait_end()
       echo2:pipe(cat1) -- pipe to cat1 and shut down cat1
-      echo2:wait()
-      assert.equal('OneTwoThreeFourFive', cat2:read())
+      echo2.stdout:wait_end()
+      local sb = {cat2:read(), cat2:read()}
+      assert.equal('OneTwoThreeFourFive', table.concat(sb))
     end))
 
   end)
