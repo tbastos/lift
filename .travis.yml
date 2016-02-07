@@ -10,7 +10,7 @@ addons:
 
 env:
   global:
-    - LUAROCKS=2.2.2
+    - LUAROCKS=2.3.0
   matrix:
     - LUA=lua5.2
     - LUA=lua5.3
