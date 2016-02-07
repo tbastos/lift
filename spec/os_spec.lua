@@ -1,5 +1,10 @@
 describe('lift.os', function()
 
+  local WAIT = 100 -- how much to wait for a process to finish
+  if os.getenv('CI') then
+    WAIT = 200
+  end
+
   local os = require 'lift.os'
   local ls = require 'lift.string'
   local async = require 'lift.async'
@@ -32,7 +37,7 @@ describe('lift.os', function()
       assert.is_number(c.pid)
       assert.is_nil(c.status)
       assert.is_nil(c.signal)
-      async.sleep(100)
+      async.sleep(WAIT)
       assert.equal(7, c.status)
       assert.equal(0, c.signal)
     end))
@@ -44,7 +49,7 @@ describe('lift.os', function()
       assert.is_nil(c.status)
       assert.is_nil(c.signal)
       c:kill()
-      async.sleep(100)
+      async.sleep(WAIT)
       assert.equal(15, c.signal) -- sigterm
       assert.error(function() c:kill() end,
         'process:kill() called after process termination')
