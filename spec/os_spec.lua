@@ -2,7 +2,7 @@ describe('lift.os', function()
 
   local WAIT = 100 -- how much to wait for a process to finish
   if os.getenv('CI') then
-    WAIT = 200
+    WAIT = 300
   end
 
   local os = require 'lift.os'
