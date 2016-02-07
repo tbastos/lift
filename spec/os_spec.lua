@@ -100,7 +100,8 @@ describe('lift.os', function()
       assert.Nil(c.stdout:try_read())
       assert.Nil(c.stderr:try_read())
       c:wait() -- await exit before reading
-      assert.equal('OneTwo', c:try_read())
+      local sb = {c:try_read(), c:try_read()}
+      assert.equal('OneTwo', table.concat(sb))
       assert.Nil(c.stderr:try_read())
     end))
 
