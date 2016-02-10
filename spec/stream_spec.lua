@@ -65,7 +65,7 @@ describe('lift.stream', function()
       for i = 1, n do input[i] = i*i end
       local fast_in = stream.from_array(input, 2)
       local slow_out = stream.to_array(out1, 6)    -- 3x slower
-      local slower_out = stream.to_array(out2, 10) -- 5x slower
+      local slower_out = stream.to_array(out2, 12) -- 6x slower
       fast_in:pipe(slow_out)
       fast_in:pipe(slower_out) -- the slowest stream sets the pace
       fast_in:wait_end()
