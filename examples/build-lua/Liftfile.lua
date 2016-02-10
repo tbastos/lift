@@ -48,7 +48,6 @@ end
 function task.build_release(release)
   local t0 = async.now()
   local filename = task.download(release)
-  sh('uname')
   sh('tar -xzf '..filename)
   sh('cd lua-'..release.version..' && make generic > build.log')
   print('Lua '..release.version..' built in '..get_elapsed(t0))
