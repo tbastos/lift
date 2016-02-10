@@ -3,7 +3,6 @@
 ------------------------------------------------------------------------------
 
 local assert, getmetatable, setmetatable = assert, getmetatable, setmetatable
-local str_gsub = string.gsub
 local co_yield = coroutine.yield
 local diagnostics = require 'lift.diagnostics'
 local native_to_lf = require'lift.string'.native_to_lf
@@ -126,7 +125,7 @@ local function prepare_stdio(p, name, fd, readable)
 end
 
 local spawn = diagnostics.trace(
-  '[os] spawning process ${t}',
+  '[os] spawning process ${p}',
   function(p)
     local file = p.file
     if not file then error('you must specify a file to spawn()', 2) end
@@ -170,45 +169,55 @@ local shell_program = (UNIX and '/bin/sh' or os.getenv'COMSPEC')
 -- Line endings in stdout and stderr are normalized to LF.
 -- Security Notice: never execute a command interpolated with external input
 -- (such as a config string) as that leaves you vulnerable to shell injection.
-local function sh(command)
-  local this_future = async_get()
-  local status, signal
-  local function on_exit(_status, _signal)
-    status = _status
-    signal = _signal
-    async_resume(this_future)
-  end
-  local stdout, stderr = uv_new_pipe(false), uv_new_pipe(false)
-  local options = {UNIX and '-c' or '/c', command, -- args
-    stdio = {nil, stdout, stderr}, hide = true, verbatim = true}
-  options.args = options
-  local proc, pid = uv_spawn(shell_program, options, on_exit)
-  if not proc then
-    return nil, diagnostics.new("child_process_error: spawn failed: ${1}", pid)
-  end
-  local so, se = '', ''
-  uv_read_start(stdout, function(err, data)
-    if data then so = so..data end
-  end)
-  uv_read_start(stderr, function(err, data)
-    if data then se = se..data end
-  end)
-  co_yield()
-  uv_close(proc)
-  so, se = native_to_lf(so), native_to_lf(se)
-  if status ~= 0 or signal ~= 0 then
-    local what
-    if signal == 0 then
-      what = 'failed with status '..status
-    else
-      what = 'interrupted with signal '..signal
+-- See sh().
+local try_sh = diagnostics.trace(
+  '[os] executing shell command: ${command}',
+  function(command, level)
+    local this_future = async_get()
+    local status, signal
+    local function on_exit(_status, _signal)
+      status = _status
+      signal = _signal
+      async_resume(this_future)
     end
-    return nil, diagnostics.new{
-      'child_process_error: shell command ${what}: ${stderr}',
-      what = what, status = status, signal = signal, stdout = so,
-      stderr = se}:set_location(2)
-  end
-  return so, se
+    local stdout, stderr = uv_new_pipe(false), uv_new_pipe(false)
+    local options = {UNIX and '-c' or '/c', command, -- args
+      stdio = {nil, stdout, stderr}, hide = true, verbatim = true}
+    options.args = options
+    local proc, pid = uv_spawn(shell_program, options, on_exit)
+    if not proc then
+      return nil, diagnostics.new("child_process_error: spawn failed: ${1}", pid)
+    end
+    local so, se = '', ''
+    uv_read_start(stdout, function(err, data)
+      if data then so = so..data end
+    end)
+    uv_read_start(stderr, function(err, data)
+      if data then se = se..data end
+    end)
+    co_yield()
+    uv_close(proc)
+    so, se = native_to_lf(so), native_to_lf(se)
+    if status ~= 0 or signal ~= 0 then
+      local what
+      if signal == 0 then
+        what = 'failed with status '..status
+      else
+        what = 'interrupted with signal '..signal
+      end
+      return nil, diagnostics.new{
+        'child_process_error: shell command ${what}: ${stderr}',
+        what = what, status = status, signal = signal, stdout = so,
+        stderr = se}:set_location(level or 2)
+    end
+    return so, se
+  end)
+
+-- Like try_sh() but raises an error if the command fails.
+local function sh(command)
+  local out, err = try_sh(command, 3)
+  if out == nil then error(err, 2) end
+  return out, err
 end
 
 ------------------------------------------------------------------------------
@@ -221,4 +230,5 @@ return {
   find_program = find_program,
   sh = sh,
   spawn = spawn,
+  try_sh = try_sh,
 }

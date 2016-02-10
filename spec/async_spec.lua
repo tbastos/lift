@@ -3,6 +3,7 @@ expose("lift.async", function()
   local function fa(n) return n end -- keep this at line 3
 
   local uv = require 'luv'
+  local su = require 'spec.util'
   local async = require 'lift.async'
 
   local TOLERANCE = 30 -- time tolerance for timer callbacks
@@ -98,11 +99,11 @@ expose("lift.async", function()
       async.check_errors() -- no unchecked errors
     end)
 
-    it("can wait() for another coroutine to finish", function()
+    it("can try_wait() for another coroutine to finish", function()
       local v = 1
       local function add_two() async.sleep(0) v = v + 2 end
       local function times_two() v = v * 2 end
-      local function wait_times_two(future) async.wait(future) v = v * 2 end
+      local function wait_times_two(future) async.try_wait(future) v = v * 2 end
       -- without wait()
       async(add_two)
       async(times_two)
@@ -115,15 +116,15 @@ expose("lift.async", function()
       assert.equal(6, v)
       -- waiting for itself?
       local future
-      local function wait_self() return async.wait(future) end
+      local function wait_self() return async.try_wait(future) end
       future = async(wait_self)
       async.run()
       assert.error_match(function() return future.results end,
         'future cannot wait for itself')
       -- catching errors
       local function boom() error('booom!') end
-      local function wait_boom() return async.wait(async(boom)) end
-      local function assert_wait_boom() assert(async.wait(async(boom))) end
+      local function wait_boom() return async.try_wait(async(boom)) end
+      local function assert_wait_boom() assert(async.try_wait(async(boom))) end
       local only_wait, assert_wait = async(wait_boom), async(assert_wait_boom)
       async.run()
       assert.falsy(only_wait.error)
@@ -134,11 +135,15 @@ expose("lift.async", function()
       async.check_errors() -- no unchecked errors
     end)
 
-    it("can wait() for a coroutine with a timeout", function()
+    it("can try_wait() for a coroutine with a timeout", function()
       local function short_task() async.sleep(TOLERANCE) return 1 end
       local function long_task() async.sleep(3*TOLERANCE) return 2 end
-      local function patient_wait(future) return async.wait(future, 4*TOLERANCE) end
-      local function impatient_wait(future) return async.wait(future, 2*TOLERANCE) end
+      local function patient_wait(future)
+        return async.try_wait(future, 4*TOLERANCE)
+      end
+      local function impatient_wait(future)
+        return async.try_wait(future, 2*TOLERANCE)
+      end
       -- successfully wait for a short task
       local f = async(impatient_wait, async(short_task))
       async.run()
@@ -154,14 +159,20 @@ expose("lift.async", function()
       async.check_errors() -- no unchecked errors
     end)
 
-    it("can wait_any() one of multiple coroutines to finish", function()
+    it("can wait() for a coroutine to timeout", su.async(function()
+      local function task() async.sleep(999) end
+      assert.error_match(function() async.wait(async(task), 50) end,
+        'timed out')
+    end))
+
+    it("can try_wait_any() one of multiple coroutines to finish", function()
       local function sleep(ms) async.sleep(ms) end
       local n, list = 50, {}
       for i = 1, n do
         list[i] = async(sleep, (n - i + 1) * TOLERANCE)
       end
       local function wait_first()
-        local first = async.wait_any(list)
+        local first = async.try_wait_any(list)
         local count = 0 -- fulfilled futures
         for i = 1, n do
           if list[i].results then
@@ -179,27 +190,27 @@ expose("lift.async", function()
       assert.equal(1, future.results[2])
       assert.near(TOLERANCE, elapsed, TOLERANCE)
       -- waiting again should return the same future
-      future = async(function() return async.wait_any(list) end)
+      future = async(function() return async.try_wait_any(list) end)
       async.run()
       assert.equal(list[n], future.results[1])
       -- wait for an error
       local a = async(sleep, 1)
       local b = async(function() error('boom') end)
-      future = async(function() assert(async.wait_any{a, b}) end)
+      future = async(function() assert(async.try_wait_any{a, b}) end)
       async.run()
       assert.equal(b.error, future.error)
       assert.matches('boom', tostring(future.error))
       async.check_errors() -- no unchecked errors
     end)
 
-    it("can wait_all() multiple coroutines to finish", function()
+    it("can try_wait_all() multiple coroutines to finish", function()
       local function sleep(ms) async.sleep(ms) end
       local n, list = 6, {}
       for i = 1, n do
         list[i] = async(sleep, i * TOLERANCE)
       end
       local function main()
-        assert(async.wait_all(list))
+        assert(async.try_wait_all(list))
         local count = 0 -- fulfilled futures
         for i = 1, n do
           if list[i].results then
@@ -230,11 +241,11 @@ expose("lift.async", function()
 
     it("may deadlock", function()
       local a, b
-      local function wait_a() async.wait(a) end
-      local function wait_b() async.wait(b) end
+      local function wait_a() async.try_wait(a) end
+      local function wait_b() async.try_wait(b) end
       a, b = async(wait_b), async(wait_a)
       local c = async(function()
-        async.wait(a, 20)
+        async.try_wait(a, 20)
         return a.results and b.results
       end)
       async.run()
@@ -247,7 +258,7 @@ expose("lift.async", function()
     local function boom() error('boom') end
     local a = async(boom, 1)
     local b = async(boom, 2)
-    local function unchecked(future) async.wait(a) return a.results end
+    local function unchecked(future) async.try_wait(a) return a.results end
     async(unchecked, 3)
     async(unchecked, 4)
     async.run()

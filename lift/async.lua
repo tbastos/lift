@@ -207,9 +207,11 @@ end
 
 -- Forces run() to exit while there are still threads waiting for events.
 -- May cause leaks and bugs. Only call if you want to terminate the application.
-local function abort()
-  uv.walk(function(h) if not h:is_closing() then h:close() end end)
-end
+local abort = diagnostics.trace(
+  '[thread] event loop ABORTED',
+  function()
+    uv.walk(function(h) if not h:is_closing() then h:close() end end)
+  end)
 
 -- Schedules a function to be called asynchronously as `f(arg)` in a coroutine.
 -- Returns a future object for interfacing with the async call.
@@ -228,29 +230,40 @@ local function check_errors()
   repeat
     unchecked_errors[future] = nil
     list[#list+1] = err
-    err.future = future
+    if not err.future then err.future = future end
     future, err = next(unchecked_errors)
   until not future
   diagnostics.aggregate("fatal: ${n} unchecked async error${s}", list):report()
 end
 
 -- Runs all async functions to completion. Call this from the main thread.
-local function run()
-  local stop
-  while 1 do
-    do_calls()
-    step()
-    if stop then return end
-    stop = not uv_run('once')
-  end
-end
+local run = diagnostics.trace(
+  '[thread] event loop started',
+  '[thread] event loop finished',
+  function()
+    local stop
+    while 1 do
+      do_calls()
+      step()
+      if stop then
+        if not uv_run('nowait') then -- really nothing left?
+          return
+        else
+          stop = false -- oops, we aren't finished
+        end
+      else
+        stop = not uv_run('once')
+      end
+    end
+  end)
 
 -- Suspends the calling thread until `future` becomes ready, or until `timeout`
 -- milliseconds have passed. The timeout is optional, and if specified must be
--- a positive integer. If the future is fulfilled, wait() returns true and the
--- future's results table. On timeout, wait() returns false and "timed out".
--- If the future raises an error, wait() returns false and the error.
-local function wait(future, timeout)
+-- a positive integer. If the future is fulfilled, returns true and the
+-- future's results table. On timeout, returns false and "timed out".
+-- If the future raises an error, returns false and the error.
+-- See wait().
+local function try_wait(future, timeout)
   local status = future.status
   if status then -- future is ready
     if status == 'failed' then return false, future.error end
@@ -281,7 +294,7 @@ local function wait(future, timeout)
   future:on_ready(cb)
   co_yield()
   if err then
-    if err ~= 'timed out' then err.future = future end
+    if err ~= 'timed out' and not err.future then err.future = future end
     return false, err
   end
   return true, res
@@ -289,7 +302,8 @@ end
 
 -- Suspends the calling thread until any future from the list becomes ready.
 -- Either returns the first fulfilled future, or nil and the first error.
-local function wait_any(futures)
+-- See wait_any().
+local function try_wait_any(futures)
   -- first we check if any future is currently ready
   local n, running = #futures, co_get()
   for i = 1, n do
@@ -314,7 +328,7 @@ local function wait_any(futures)
   end
   co_yield()
   if first_err then
-    first_err.future = first
+    if not first_err.future then first_err.future = first end
     return nil, first_err
   end
   return first
@@ -323,12 +337,15 @@ end
 -- Suspends the calling thread until all futures in the list become ready.
 -- Returns true when all futures are fulfilled, or false and a diagnostic
 -- object when errors occur. The diagnostic aggregates all raised errors.
-local function wait_all(futures)
+-- See wait_all().
+local function try_wait_all(futures)
   local n, errors, running = #futures, nil, co_get()
   local function callback(future, err, res)
     if err then
       if not errors then errors = {err} else errors [#errors+1] = err end
-      err.future = future -- keep track of which future raised the error
+      if not err.future then
+        err.future = future -- keep track of which future raised the error
+      end
     end
     n = n - 1
     if n == 0 then resume_soon(running) end
@@ -342,7 +359,29 @@ local function wait_all(futures)
   if n > 0 then co_yield() end
   if not errors then return true end
   return false, diagnostics.aggregate(
-    'fatal: wait_all() caught ${n} error${s}', errors):traceback(2)
+    'fatal: caught ${n} error${s} while waiting for futures', errors):traceback(2)
+end
+
+-- Like try_wait() but raises an error on failure. Always returns nil.
+local function wait(future, timeout)
+  local ok, err = try_wait(future, timeout)
+  if not ok then error(err) end
+end
+
+-- Like try_wait_any() but raises an error on failure. Always returns nil.
+local function wait_any(futures)
+  local ok, err = try_wait(futures)
+  if not ok then error(err) end
+end
+
+-- Like try_wait_all() but raises an error on failure. Always returns nil.
+local function wait_all(futures)
+  local ok, err = try_wait_all(futures)
+  if not ok then
+    local nested = err.nested
+    if #nested == 1 then err = nested[1] end
+    error(err)
+  end
 end
 
 -- Suspends the calling thread until `dt` milliseconds have passed.
@@ -371,9 +410,13 @@ return setmetatable({
   async = async,
   call = call,
   check_errors = check_errors,
+  now = uv_now,
   run = run,
   running = co_get,
   sleep = sleep,
+  try_wait = try_wait,
+  try_wait_all = try_wait_all,
+  try_wait_any = try_wait_any,
   wait = wait,
   wait_all = wait_all,
   wait_any = wait_any,

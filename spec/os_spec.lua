@@ -11,7 +11,7 @@ describe('lift.os', function()
   local config = require 'lift.config'
   local su = require 'spec.util'
 
-  it('offers sh() to execute a shell command', su.async(function()
+  it('offers try_sh() to try to execute a shell command', su.async(function()
     local out, err = assert(os.sh'echo Hello world!|cat')
     assert.equal('Hello world!\n', out)
     assert.equal('', err)
@@ -24,9 +24,15 @@ describe('lift.os', function()
     assert.equal('', out)
     assert.equal('Hello from stderr', err)
 
-    out, err = os.sh'invalid_cmd error'
+    out, err = os.try_sh'invalid_cmd error'
     assert.Nil(out)
     assert.match('shell command failed', err)
+  end))
+
+  it("offers sh() to execute a shell command or raise an error", su.async(function()
+    os.sh'echo Hello'
+    assert.error_match(function() os.sh'invalid_cmd error' end,
+      'shell command failed with status')
   end))
 
   describe("child processes", function()

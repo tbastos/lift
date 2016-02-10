@@ -141,6 +141,17 @@ end
 -- Short for new(...):report()
 local function report(...) new(...):report() end
 
+-- Creates and raises a diagnostic object as an error with a location.
+-- The first argument is a table describing the diagnostic, as can be
+-- passed to new(). The second (and optional) argument indicates the
+-- stack level where the error occurred, with the same semantics as
+-- Lua's standard error() function.
+local function raise(diagnostic_descr_table, level)
+  local d = new(diagnostic_descr_table)
+  if level ~= 0 then d:set_location((level or 1) + 1) end
+  error(d)
+end
+
 -- Raises the most recent error-level diagnostic
 local function check_error()
   if last_error then error(last_error) end
@@ -468,6 +479,7 @@ return {
   levels = levels,
   new = new,
   pcall = pcall,
+  raise = raise,
   report = report, Reporter = Reporter,
   set_consumer = set_consumer,
   set_stderr = set_stderr,

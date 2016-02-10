@@ -13,7 +13,8 @@ local inspect = require'lift.util'.inspect
 local diagnostics = require 'lift.diagnostics'
 
 local async = require 'lift.async'
-local async_get, await, wait_all = async._get, async.wait, async.wait_all
+local async_get = async._get
+local try_wait, try_wait_all = async.try_wait, async.try_wait_all
 
 ------------------------------------------------------------------------------
 -- Graph construction and cycle detection
@@ -70,7 +71,7 @@ Task.__call = diagnostics.trace(
   '[task] finished ${self} ${arg}',
   function(self, arg, extra)
     local future = self:async(arg, extra)
-    local ok, res = await(future)
+    local ok, res = try_wait(future)
     if not ok then
       res:report()
     end
@@ -158,7 +159,7 @@ TaskList.__call = diagnostics.trace(
     for i = 1, #self do
       t[i] = self[i]:async(arg, extra)
     end
-    local ok, err = wait_all(t)
+    local ok, err = try_wait_all(t)
     if not ok then
       if #err.nested == 1 then err = err.nested[1] end
       err:report()
@@ -194,7 +195,10 @@ function Namespace.__index(t, k)
 end
 
 function Namespace.__newindex(t, k, v)
-  t.tasks[k] = new_task(t, k, v)
+  if getmetatable(v) ~= Task then
+    v = new_task(t, k, v)
+  end
+  t.tasks[k] = v
 end
 
 function Namespace.__call(namespace, t)

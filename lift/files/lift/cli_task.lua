@@ -109,7 +109,7 @@ function call_cmd:run()
   write(ESC'green', 'Calling ', tostring(callee), inspect(args),
     ESC'clear', '\n')
   callee(args)
-  local res = callee:get_result_for(args)
+  local res = callee:get_results(args)
   write(ESC'green', 'Task results = ', inspect(res), ESC'clear')
   plot_graph()
 end
