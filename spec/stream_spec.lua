@@ -61,11 +61,11 @@ describe('lift.stream', function()
       end
     end)
     it("implements flow control", su.async(function()
-      local n, input, out1, out2 = 20, {}, {}, {}
+      local n, input, out1, out2 = 32, {}, {}, {}
       for i = 1, n do input[i] = i*i end
       local fast_in = stream.from_array(input, 1)
-      local slow_out = stream.to_array(out1, 10)   -- 10x slower
-      local slower_out = stream.to_array(out2, 30) -- 30x slower
+      local slow_out = stream.to_array(out1, 8)
+      local slower_out = stream.to_array(out2, 16)
       fast_in:pipe(slow_out)
       fast_in:pipe(slower_out) -- the slowest stream sets the pace
       fast_in:wait_end()
