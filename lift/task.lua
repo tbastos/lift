@@ -67,8 +67,8 @@ local Task = {
 Task.__index = Task
 
 Task.__call = diagnostics.trace(
-  '[task] running ${self} ${arg}',
-  '[task] finished ${self} ${arg}',
+  '[task] running ${self} (${arg})',
+  '[task] finished ${self} (${arg})',
   function(self, arg, extra)
     local future = self:async(arg, extra)
     local ok, res = try_wait(future)
@@ -152,8 +152,8 @@ end
 local TaskList = {}
 
 TaskList.__call = diagnostics.trace(
-  '[task] running ${self} ${arg}',
-  '[task] finished ${self} ${arg}',
+  '[task] running ${self} (${arg})',
+  '[task] finished ${self} (${arg})',
   function(self, arg, extra)
     local t = {}
     for i = 1, #self do

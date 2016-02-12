@@ -13,7 +13,6 @@
 local assert, rawget, type, xpcall = assert, rawget, type, xpcall
 local getmetatable, setmetatable = getmetatable, setmetatable
 local unpack = table.unpack or unpack -- LuaJIT compatibility
-local clock = os.clock
 local str_find, str_gmatch, str_match = string.find, string.gmatch, string.match
 local str_rep, str_sub = string.rep, string.sub
 local dbg_getinfo, dbg_getlocal = debug.getinfo, debug.getlocal
@@ -32,6 +31,19 @@ local ESC = color.ESC
 -- allow stderr to be redirected
 local stderr = io.stderr
 local function set_stderr(fd) stderr = fd end
+
+------------------------------------------------------------------------------
+-- Helpers to time the duration of function calls
+------------------------------------------------------------------------------
+
+-- returns the current timestamp
+local now = require'luv'.now
+
+-- returns the elapsed time since t0, in seconds
+local function get_elapsed(t0)
+  return (now() - t0) / 1000
+end
+
 
 ------------------------------------------------------------------------------
 -- Diagnostic Levels (ignored, remark, warning, error, fatal)
@@ -347,7 +359,7 @@ local function set_tracing(v)
 end
 
 -- helpers to expand trace messages
-local nil_arg = setmetatable({}, {__tostring = function() return '<nil>' end})
+local nil_arg = setmetatable({}, {__tostring = function() return 'nil' end})
 local function expand_arg(t, name)
   local v = t[name]
   return v and inspect(v, 60)
@@ -381,9 +393,9 @@ local function trace(pre, post, f)
     stderr:write(ESC'blue', expand_trace(pre, args), ESC'clear', '\n')
     if not post then return f(...) end -- optimization
     -- time the call and print post message
-    local t0 = clock()
+    local t0 = now()
     local res = {f(...)}
-    local time = (' [%.2fs]'):format(clock() - t0)
+    local time = (' [%.2fs]'):format(get_elapsed(t0))
     post = expand_trace(post, args)
     stderr:write(ESC'blue', post, ESC'cyan', time, ESC'clear', '\n')
     return unpack(res)
@@ -443,7 +455,7 @@ end
 ------------------------------------------------------------------------------
 
 local function wrap(f)
-  local t0 = clock()
+  local t0 = now()
   Reporter.set_new()
   local ok, diag = pcall(f)
   if not ok then
@@ -457,7 +469,7 @@ local function wrap(f)
     end
   end
   if tracing then
-    local dt, mem = (clock() - t0), collectgarbage 'count'
+    local dt, mem = get_elapsed(t0), collectgarbage 'count'
     local fmt = 'time %.2fs, memory %iK'
     if mem > 1024 then
       mem = mem / 1024

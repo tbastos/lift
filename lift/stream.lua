@@ -192,21 +192,19 @@ Readable.stop = diagnostics.trace(
   end)
 
 -- send 'on_data' event
-local send_data = diagnostics.trace('[stream] read from ${self}: ${data} ${err}',
-  function(self, data, err)
-    for k, cb in pairs(self.consumers) do
-      cb(self, data, err)
-    end
-  end)
+local function send_data(self, data, err)
+  for k, cb in pairs(self.consumers) do
+    cb(self, data, err)
+  end
+end
 
 -- send 'on_readable' event
-local send_readable = diagnostics.trace('[stream] readable: ${self}',
-  function(self)
-    for i = 1, #self do
-      async.call(self[i], self)
-      self[i] = nil
-    end
-  end)
+local function send_readable(self)
+  for i = 1, #self do
+    async.call(self[i], self)
+    self[i] = nil
+  end
+end
 
 -- send 'on_end' event
 local send_end = diagnostics.trace('[stream] ended: ${self}',
@@ -220,35 +218,33 @@ local send_end = diagnostics.trace('[stream] ended: ${self}',
   end)
 
 
-Readable.push = diagnostics.trace(
-  '[stream] pushed to ${self}: ${data} ${err}',
-  function(self, data, err)
-    assert(self.read_error == nil, 'cannot push() past the end of the stream')
-    if self.flowing then -- just send the data now
-      send_data(self, data, err)
-      if data == nil then
-        self.read_error = err or false
-        send_readable(self) -- in flowing mode, only send 'readable' at the end
-        send_end(self)
-        return false
-      else
-        return true
-      end
-    end
-    -- buffer the data
-    if data == nil then -- this is the end of the stream
+function Readable.push(self, data, err)
+  assert(self.read_error == nil, 'cannot push() past the end of the stream')
+  if self.flowing then -- just send the data now
+    send_data(self, data, err)
+    if data == nil then
       self.read_error = err or false
-      send_readable(self)
+      send_readable(self) -- in flowing mode, only send 'readable' at the end
+      send_end(self)
       return false
+    else
+      return true
     end
-    local buf = self.rbuf
-    local n = #buf
-    buf[n+1] = data
-    if n == 0 then -- data just became available
-      send_readable(self)
-    end
-    return (n < self.high_water)
-  end)
+  end
+  -- buffer the data
+  if data == nil then -- this is the end of the stream
+    self.read_error = err or false
+    send_readable(self)
+    return false
+  end
+  local buf = self.rbuf
+  local n = #buf
+  buf[n+1] = data
+  if n == 0 then -- data just became available
+    send_readable(self)
+  end
+  return (n < self.high_water)
+end
 
 function Readable:try_read()
   local buf = self.rbuf
@@ -329,11 +325,9 @@ end
 local Writable = {}
 Writable.__index = Writable
 
-Writable.write = diagnostics.trace(
-  '[stream] writing to ${self}: ${data} ${err}',
-  function(self, data, err)
-    return self.request_write(data, err)
-  end)
+function Writable.write(self, data, err)
+  return self.request_write(data, err)
+end
 
 function Writable:on_drain(callback)
   self[#self+1] = callback
@@ -358,13 +352,12 @@ function Writable:has_finished()
 end
 
 -- send 'on_drain' event
-local send_drain = diagnostics.trace('[stream] drained: ${self}',
-  function(self)
-    for i = 1, #self do
-      async.call(self[i], self)
-      self[i] = nil
-    end
-  end)
+local function send_drain(self)
+  for i = 1, #self do
+    async.call(self[i], self)
+    self[i] = nil
+  end
+end
 
 -- terminate stream and send 'on_finish' event
 local shutdown = diagnostics.trace('[stream] finished: ${self}',

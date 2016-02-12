@@ -87,7 +87,7 @@ function run_cmd:run()
     tasks[i] = task:get_task(name)
   end
   if #tasks == 0 then
-    tasks[1] = task:get_task 'default'
+    tasks[1] = task:get_task'default'
   end
   tasks()
   plot_graph()
