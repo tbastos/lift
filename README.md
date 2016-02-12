@@ -2,7 +2,7 @@
 
 [![Latest Release](https://img.shields.io/github/release/tbastos/lift.svg)](https://github.com/tbastos/lift/releases) [![Build status on UNIX](https://travis-ci.org/tbastos/lift.svg?branch=master)](https://travis-ci.org/tbastos/lift) [![Build status on Windows](https://ci.appveyor.com/api/projects/status/j15esm249a67d7f6?svg=true)](https://ci.appveyor.com/project/tbastos/lift) [![Coverage Status](https://coveralls.io/repos/tbastos/lift/badge.svg?branch=master&service=github)](https://coveralls.io/github/tbastos/lift?branch=master) [![License](http://img.shields.io/badge/License-MIT-brightgreen.svg)](LICENSE)
 
-Lift is both a general-purpose **task automation toolkit** and a **framework for command-line tools** in Lua. It's well suited for creating build scripts, testers, code generators, package managers, and so forth.
+Lift is both a general-purpose **task automation toolkit** and a **framework for command-line tools** in Lua. It's well suited for creating build scripts, checkers, code generators, package managers, and so forth.
 
 ## Features
 - **Tasks** and dependencies concisely written as Lua functions that can run in parallel.
@@ -26,13 +26,13 @@ Lift is both a general-purpose **task automation toolkit** and a **framework for
 
 Please use [LuaRocks] to install:
 
-```sh
+```
 luarocks install lift
 ```
 
 ## Sample Liftfile.lua
 
-To write a build script for you project, create a `Liftfile.lua` at the project root (analogous to a `Makefile`).
+Create a file named `Liftfile.lua` at your project's root directory:
 
 ~~~lua
 local fs = require 'lift.fs'
@@ -75,7 +75,7 @@ function task.clean()
 end
 ~~~
 
-Calling `lift` from the project root will produce something like:
+Calling `lift` from the root directory (where `Liftfile.lua` is located) will produce:
 
 ~~~
 ❯ lift
@@ -100,11 +100,14 @@ Hello tbastos!
 Deleting /Users/tbastos/Work/lift/examples/downloads/lua-5.3.2.tar.gz
 ~~~
 
-To plot a graph of task calls use `lift task run --plot graph.svg` (requires graphviz)
+To plot a graph of task calls use (requires graphviz):
+~~~
+❯ lift task run --plot graph.svg
+~~~
 
-![Task call graph](lift-examples-downloads-graph.svg)
+![Task call graph](http://tbastos.github.io/i/lift-examples-downloads-graph.svg)
 
-For debugging purposes you may want to enable tracing:
+For debugging purposes you may want to run `lift` with tracing enabled:
 
 ~~~
 ❯ lift --trace
