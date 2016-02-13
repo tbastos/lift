@@ -1,9 +1,9 @@
-package = "lift"
-version = "scm-0"
+package = "Lift"
+version = "0.1.0-4"
 
 source = {
-  url = "git://github.com/tbastos/lift",
-  branch = "master"
+  url = "https://github.com/tbastos/lift/archive/v0.1.0.tar.gz",
+  dir = "lift-0.1.0"
 }
 
 description = {
@@ -32,6 +32,7 @@ build = {
     ["lift.os"] = "lift/os.lua",
     ["lift.path"] = "lift/path.lua",
     ["lift.request"] = "lift/request.lua",
+    ["lift.stream"] = "lift/stream.lua",
     ["lift.string"] = "lift/string.lua",
     ["lift.task"] = "lift/task.lua",
     ["lift.template"] = "lift/template.lua",

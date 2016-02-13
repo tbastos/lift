@@ -33,7 +33,7 @@ before_script:
 
 script:
   - LUA_INIT="require'luacov'" busted -v
-  - luarocks make
+  - luarocks make lift-scm-0.rockspec
 
 after_success:
   - luacov-coveralls -v

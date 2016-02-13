@@ -8,7 +8,7 @@ Lift is both a general-purpose **task automation toolkit** and a **framework for
 - **Tasks** and dependencies concisely written as Lua functions that can run in parallel.
 - **Pipelines** consisting of object streams (readable, writable, duplex), pipes (flow control) and filters (transform streams).
 - **Multitasking** with async/await, futures and cooperative scheduling on top of Lua coroutines.
-- **Asynchronous I/O** (files, networking, IPC) and process spawning based on [libuv].
+- **Asynchronous I/O** (files, networking, IPC) and process spawning powered by [libuv].
 - **Diagnostics** engine for high-quality error reporting, testing and tracing.
 - Portable **filesystem operations** and `glob()` for shell-style pattern matching.
 - Composable **command-line interfaces** based on command hierarchies.

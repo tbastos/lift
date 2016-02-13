@@ -34,7 +34,7 @@ build_script:
   - luarocks install luv
   - luarocks install busted
   - busted -o tap -v
-  - luarocks make
+  - luarocks make lift-scm-0.rockspec
   - lift --help
 
 after_build:
