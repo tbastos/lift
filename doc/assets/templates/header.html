@@ -1,0 +1,23 @@
+<header>
+  <div id="top">
+    <div class="content-wrapper">
+      <p><a href="{:to_page'/index':}"><img src="{:to_file'/media/lift-logo.svg':}" class="svg logo"/></a></p>
+      <p class="subtitle">{:site.subtitle:}</p>
+      <p class="header-right"><a href="{:github_url:}"><span class="octicon octicon-mark-github"></span>View on GitHub</a></p>
+      <p class="header-right"><a href="{:luarocks_url:}"><img src="{:to_file'/media/luarocks-mark.svg':}" class="svg icon"/>View on LuaRocks</a></p>
+      <p class="header-right"><a href="{:github_url:}/releases/tag/v{:config.APP_VERSION:}"><span class="octicon octicon-tag"></span>Version {:config.APP_VERSION:}</a></p>
+    </div>
+  </div>
+  <div id='sub'>
+    <div class="content-wrapper">
+      <p id="breadcrumbs">
+        <a href="{:to_page(page.section.id..'/index'):}">{:page.section.title:}</a>
+        <span id="carat">❯</span>
+        {:page.title or page.title_short:}
+      </p>
+      <p id='edit'>
+        <a href="{:doc_content_url:}{:page.url:}.md"><span class="octicon octicon-pencil"></span> Edit this page on GitHub</a>
+      </p>
+    </div>
+  </div>
+</header>

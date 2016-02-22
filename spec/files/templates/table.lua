@@ -6,6 +6,6 @@
   table.sort(keys)
   for i, k in ipairs(keys) do
 %}
-  {( 'row.lua' << {k = k, v = t[k]} )},
+  {! 'row.lua' !! {k = k, v = t[k]} !},
 {% end %}
 }

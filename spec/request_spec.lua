@@ -26,22 +26,22 @@ describe('lift.request', function()
       'Protocol .- not supported')
   end))
 
-  it("can fetch a PNG image (Google's logo)", su.async(function()
+  it("can fetch a PNG image", su.async(function()
     local sb = {} -- string buffer containing the page
     req('www.google.com'):pipe(stream.to_array(sb)):wait_finish()
     local html = table.concat(sb)
     assert.equal('</html>', html:sub(-7))
-    -- parse Google's logo URL
-    local logo_path = html:match([=[["'(]([^"'()]*googlelogo[^"'()]*%.png)["')]]=])
-    if not logo_path then
-      print('Failed to find googlelogo.png in page: ', html)
+    -- find a PNG
+    local png_path = html:match([=[["'(]([^"'()]*nav_logo[^"'()]*%.png)["')]]=])
+    if not png_path then
+      print('Failed to find .png in page: ', html)
     end
-    assert.is_string(logo_path)
+    assert.is_string(png_path)
     -- download the PNG
     local sb2 = {}
-    req('www.google.com'..logo_path):pipe(stream.to_array(sb2)):wait_finish()
+    req('www.google.com'..png_path):pipe(stream.to_array(sb2)):wait_finish()
     local content = table.concat(sb2)
-    assert.equal(5482, #content) -- size of the PNG
+    assert.True(#content > 5000) -- size of the PNG
   end))
 
 end)

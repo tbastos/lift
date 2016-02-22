@@ -290,6 +290,27 @@ local function glob(pattern, vars, get_var)
 end
 
 ------------------------------------------------------------------------------
+-- Convenience functions to read/write a file in one call
+------------------------------------------------------------------------------
+
+-- Returns the entire contents of a file in one string.
+local function read_file(filename)
+  local f, err = io.open(filename, 'r')
+  if not f then error(err, 2) end
+  local contents = f:read('*a')
+  f:close()
+  return contents
+end
+
+-- Creates or sets the contents of a file to `contents` (a string).
+local function write_file(filename, contents)
+  local f, err = io.open(filename, 'w')
+  if not f then error(err, 2) end
+  f:write(contents)
+  f:close()
+end
+
+------------------------------------------------------------------------------
 -- File I/O Streams
 ------------------------------------------------------------------------------
 
@@ -385,6 +406,7 @@ return {
   match = match,                -- exported for testing
   mkdir = mkdir,
   mkdir_all = mkdir_all,
+  read_file = read_file,
   read_from = read_from,
   readlink = readlink,
   realpath = realpath,
@@ -394,5 +416,6 @@ return {
   symlink = symlink,
   unlink = unlink,
   utime = utime,
+  write_file = write_file,
   write_to = write_to,
 }

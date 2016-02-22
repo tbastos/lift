@@ -1,4 +1,4 @@
-package = "lift"
+package = "Lift"
 version = "scm-0"
 
 source = {
@@ -9,11 +9,11 @@ source = {
 description = {
   summary = "Lua automation tool and scripting framework.",
   homepage = "http://lift.run",
-  license = "MIT/X11",
+  license = "MIT",
 }
 
 dependencies = {
-  'lua >= 5.1', -- actually 5.2 and LuaJIT, but LuaJIT self-identifies as 5.1
+  'lua >= 5.1', -- actually >= 5.2 or LuaJIT, but LuaJIT self-identifies as 5.1
   'lpeg >= 1.0.0',
   'luv >= 1.8.0-2',
 }
@@ -32,15 +32,14 @@ build = {
     ["lift.os"] = "lift/os.lua",
     ["lift.path"] = "lift/path.lua",
     ["lift.request"] = "lift/request.lua",
+    ["lift.stream"] = "lift/stream.lua",
     ["lift.string"] = "lift/string.lua",
     ["lift.task"] = "lift/task.lua",
     ["lift.template"] = "lift/template.lua",
     ["lift.util"] = "lift/util.lua",
-
     ["lift.files.cli"] = "lift/files/cli.lua",
     ["lift.files.cli_config"] = "lift/files/cli_config.lua",
     ["lift.files.init"] = "lift/files/init.lua",
-
     ["lift.files.lift.cli_task"] = "lift/files/lift/cli_task.lua",
   },
 

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset='utf-8'>
+{% if page.module then %}
+    <title>{:page.module:} - {:site.title:} {:page.section.title_short:}</title>
+{% else %}
+    <title>{:site.title:} - {: page.url == '/index' and site.subtitle or page.title :}</title>
+{% end %}
+    <link rel="stylesheet" type="text/css" href="{:to_file'/styles.css':}" />
+    <link rel="icon" sizes="16x16 32x32 48x48 64x64" href="{:to_file'/media/favicon.ico':}" />
+    <script src="{:to_file'/js/jquery.js':}" defer></script>
+    <script src="{:to_file'/js/main.js':}" defer></script>
+    <script src="{:to_file'/js/prism.js':}" defer></script>
+  </head>
+  <body>
+    {! "header.html" !}
+    <div class="content-wrapper">
+      {! "nav.html" !}
+      <article class="main-content">
+        <section>
+          <section class="section">
+{% if page.title then %}
+            <h1>{:page.title:}</h1>
+{% end %}
+{% if page.show_toc then %}
+            <h3>Table of Contents</h3>
+            {:page.index:}
+{% end %}
+            {:page.body:}
+          </section>
+          {? "tasks.html" ?}
+        </section>
+        {! "footer.html" !}
+      </article>
+    </div>
+  </body>
+</div>
+</html>

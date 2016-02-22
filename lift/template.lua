@@ -4,8 +4,7 @@
 
 local assert, load, tostring, type = assert, load, tostring, type
 local setmetatable = setmetatable
-local ssub = string.sub
-local sfind = string.find
+local ssub, sfind, sformat = string.sub, string.find, string.format
 local tconcat = table.concat
 
 local fs = require 'lift.fs'
@@ -16,39 +15,41 @@ local path = require 'lift.path'
 ------------------------------------------------------------------------------
 
 local tags = {
-  ['{{'] = '}}', -- expressions
-  ['{%'] = '%}', -- statements (at the start of line, supresses \n before it)
-  ['{('] = ')}', -- includes
-  ['{#'] = '#}', -- comments (at the start of line, supresses \n before it)
+  ['{:'] = ':}', -- expressions
+  ['{%'] = '%}', -- statements (at line start supresses the preceding \n)
+  ['{!'] = '!}', -- includes
+  ['{?'] = '?}', -- comments (at line start supresses the preceding \n)
 }
 
 local rewriteTag = {
-  ['{{'] = function(s) return '_put(_tostr('..s..'))' end,
+  ['{:'] = function(s) return ' _p(_tostr('..s..'))' end,
   ['{%'] = function(s) return s end,
-  ['{('] = function(s, ns)
-    local name, ctx, sep = s, '_ctx', sfind(s, '<<', nil, true)
+  ['{!'] = function(s, ns)
+    local name, ctx, sep = s, '_ctx', sfind(s, '!!', nil, true)
     if sep then name = ssub(s, 1, sep - 1) ; ctx = ssub(s, sep + 2) end
-    return '_load('..name..', _name)(_put,'..ctx..', _ns+'..ns..')'..
+    return '_load('..name..', _name)(_p,'..ctx..', _ns+'..ns..')'..
       (ctx == '_ctx' and '' or '_ctx=context;') -- restore _ctx
   end,
-  ['{#'] = function(s) return nil end,
+  ['{?'] = function(s) return nil end,
 }
 
 local function rewrite_lines(c, ns, str, s, e)
   local before, after = ssub(str, s - 2, s), ssub(str, e, e + 2)
-  if before == '%}\\' or before == '#}\\' then s = s + 2 end
-  if after == '\n{%' or after == '\n{#' then e = e - 1 end
+  if before == '%}\\' or before == '?}\\' then s = s + 2 end
+  if after == '\n{%' or after == '\n{?' then e = e - 1 ; c[#c+1] = '\n' end
   while true do
     local i, j = sfind(str, '\n *', s)
     if not i or i >= e then -- last string
       if s <= e then
-        c[#c + 1] = '_put[=[\n'; c[#c + 1] = ssub(str, s, e); c[#c + 1] = ']=]'
+        c[#c + 1] = ' _p'
+        c[#c + 1] = sformat('%q', ssub(str, s, e))
       end
       return ns
     else -- string + newline + spaces
       ns = j - i
-      c[#c + 1] = '_put[=[\n'; c[#c + 1] = ssub(str, s, j); c[#c + 1] = ']=]'
-      c[#c + 1] = '_put(_id)'
+      c[#c + 1] = ' _p'
+      c[#c + 1] = sformat('%q', ssub(str, s, j))
+      c[#c + 1] = ' _p(_id)'
     end
     s = j + 1
   end
@@ -57,7 +58,7 @@ end
 local function rewrite(str, name)
   assert(str, 'missing template string')
   local c = {'local _name="', name or 'unnamed',
-    '";local _put,context,_ns=...;_ctx=context;',
+    '";local _p,context,_ns=...;_ctx=context or _env;',
     'local _tostr,_ns=_tostr,_ns or 0;local _id=(" "):rep(_ns);'}
   local i, j, ns = 1, 1, 0 -- ns: num spaces after last \n, -1 after indenting
   while true do
@@ -73,7 +74,7 @@ local function rewrite(str, name)
         j = y + 1; i = j
       else
         name = name or str
-        error("missing "..te.." to close a tag in template '"..name.."'", 2)
+        error("missing "..te.." in template '"..name.."'", 2)
       end
     else
       i = s + 1
@@ -94,9 +95,17 @@ local function to_str(x)
 end
 
 local env = setmetatable({
-  _ctx = '',      -- changed at the start of every template function call
-  _env = {},      -- set via set_env()
-  _load = '',     -- constant, set to function 'load' below
+  _ctx = '',       -- changed at the start of every template function call
+  _env = {         -- set via set_env()
+    assert = assert,
+    ipairs = ipairs,
+    os = os,
+    pairs = pairs,
+    string = string,
+    table = table,
+    type = type,
+  },
+  _load = '',      -- constant, set to function 'load' below
   _tostr = to_str, -- constant
 }, {
   __index = function(t, k) return t._ctx[k] or t._env[k] end,

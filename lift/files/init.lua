@@ -4,8 +4,8 @@
 
 local config = ...
 local fs = require 'lift.fs'
-local path = require 'lift.path'
 local ls = require 'lift.string'
+local path = require 'lift.path'
 local WINDOWS = require'lift.util'._WINDOWS
 
 -- Default editor

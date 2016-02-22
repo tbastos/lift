@@ -128,17 +128,18 @@ describe('lift.fs', function()
 
   end)
 
-  -- helper to test file streams
-  local function read_file(path)
-    local f = assert(io.open(path, 'r'))
-    local contents = f:read'*a'
-    f:close()
-    return contents
-  end
+  describe("convenience functions", function()
+    it("offers read_file()/write_file() to read/write a whole file", function()
+      local str = "One\nTwo\nThree\n"
+      fs.write_file('temp_fs_rw_file', str)
+      assert.equal(str, fs.read_file('temp_fs_rw_file'))
+      fs.unlink('temp_fs_rw_file')
+    end)
+  end)
 
   describe("readable file stream", function()
 
-    local LICENSE = read_file('LICENSE')
+    local LICENSE = fs.read_file('LICENSE')
     assert.is_string(LICENSE)
     assert.True(#LICENSE > 100 and #LICENSE < 8000)
 
@@ -179,7 +180,7 @@ describe('lift.fs', function()
       local sb = {'Hello world!\n'}
       local from_sb = stream.from_array(sb)
       from_sb:pipe(fs.write_to('tmp_hello')):wait_finish()
-      assert.equal('Hello world!\n', read_file('tmp_hello'))
+      assert.equal('Hello world!\n', fs.read_file('tmp_hello'))
       fs.unlink('tmp_hello')
     end))
 
@@ -187,14 +188,14 @@ describe('lift.fs', function()
       local sb = {'Hello ', 'world!', '\nFrom string buffer\n'}
       local from_sb = stream.from_array(sb)
       from_sb:pipe(fs.write_to('tmp_hello')):wait_finish()
-      assert.equal('Hello world!\nFrom string buffer\n', read_file('tmp_hello'))
+      assert.equal('Hello world!\nFrom string buffer\n', fs.read_file('tmp_hello'))
       fs.unlink('tmp_hello')
     end))
 
     it("can write a copy of a readable file", su.async(function()
       local path = 'LICENSE'
       fs.read_from(path):pipe(fs.write_to('tmp_copy')):wait_finish()
-      assert.equal(read_file(path), read_file('tmp_copy'))
+      assert.equal(fs.read_file(path), fs.read_file('tmp_copy'))
       fs.unlink('tmp_copy')
     end))
   end)

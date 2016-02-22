@@ -1,0 +1,19 @@
+<nav class="sidebar">
+  <ul class="nav-sections">
+{%
+  for i, sec_id in ipairs(sections) do
+    local section = sections[sec_id]
+%}
+    <li class="nav-section-name">
+      <a href="{:to_page(sec_id..'/index'):}">{:section.title_short:}</a>
+      <ul class="nav-section-pages">
+{% for i, page in ipairs(section) do %}
+        <li class="nav-section-page">
+          <a href="{:to_page(page.url):}">{:page.title_short:}</a>
+        </li>
+{% end %}
+      </ul>
+  </li>
+{% end %}
+  </ul>
+</nav>

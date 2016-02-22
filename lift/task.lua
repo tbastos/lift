@@ -83,6 +83,11 @@ function Task.__tostring(task)
   return prefix..(prefix == '' and '' or '.')..task.name
 end
 
+function Task:desc(desc)
+  assert(type(desc) == 'string')
+  self.description = desc
+end
+
 local function get_or_start(self, arg, extra)
   local futures = self.futures
   local future = futures[arg or 1]

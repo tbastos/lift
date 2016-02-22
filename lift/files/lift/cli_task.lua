@@ -122,16 +122,26 @@ local list_cmd = task_cmd:command 'list'
   :desc('list [pattern]', 'Print tasks that match an optional pattern')
 
 local function list_namespace(ns, pattern)
-  local tasks, count = ns.tasks, 0
-  for i, name in ipairs(util.keys_sorted(tasks)) do
-    local full_name = tostring(tasks[name])
+  local task_descs, width = {}, 0
+  for name, task_object in pairs(ns.tasks) do
+    local full_name = tostring(task_object)
     if full_name:find(pattern) then -- filter by pattern
-      count = count + 1
-      local indent = (' '):rep(30 - #full_name)
-      write(full_name, indent, ESC'dim', '-- undocumented task', ESC'clear', '\n')
+      if name == 'default' and full_name ~= 'default' then
+        task_descs[#task_descs+1] = name
+        task_descs[name] = '= '..full_name
+      else
+        task_descs[#task_descs+1] = full_name
+        task_descs[full_name] = task_object.description or ''
+      end
+      if width < #full_name then width = #full_name end
     end
   end
-  local nested = ns.nested
+  table.sort(task_descs)
+  for i, name in ipairs(task_descs) do
+    local indent = (' '):rep(width - #name)
+    write(ESC'green', name, ESC'clear', indent, '  ', task_descs[name], '\n')
+  end
+  local count, nested = #task_descs, ns.nested
   for i, name in ipairs(util.keys_sorted(nested)) do
     count = count + list_namespace(nested[name], pattern)
   end
@@ -145,5 +155,5 @@ function list_cmd:run()
   end
   local count = list_namespace(task, pattern)
   local suffix = (pattern == '.' and '' or (" with pattern '"..pattern.."'"))
-  write(ESC'dim', '-- Found ', count, ' tasks', suffix, ESC'clear', '\n')
+  write('# Found ', count, ' tasks', suffix, '\n')
 end

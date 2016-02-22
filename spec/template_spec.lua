@@ -19,7 +19,7 @@ describe('lift.template', function()
 
   it('supports simple expressions', function()
     local s = render_str([[
-Hello {{first}}, {{sub[1]}}, {{sub[2]}}, {{ third:upper() }}!]],
+Hello {:first:}, {:sub[1]:}, {:sub[2]:}, {: third:upper() :}!]],
       { first = 'One', sub = {true, 3}, third = 'Four' })
     assert.equal('Hello One, true, 3, FOUR!', s)
   end)
@@ -27,31 +27,29 @@ Hello {{first}}, {{sub[1]}}, {{sub[2]}}, {{ third:upper() }}!]],
   it('supports statements', function()
     local s = render_str([[
 {% for _, name in ipairs(names) do %}
- * {{name}};
-{% end %}]],
-      { names = {'One', 'Two', 'Three'}, ipairs = ipairs })
+ * {:name:};
+{% end %}]], {names = {'One', 'Two', 'Three'}})
     assert.equal('\n * One;\n * Two;\n * Three;', s)
   end)
 
   it('supports partials', function()
     inject_file('/fake/templ.ct', [[
-Hello {{name}}!
+Hello {:name:}!
 {% if child then %}
-  {% if true then %}{( "./templ.ct" << child )}{% end %}
+  {% if true then %}{! "./templ.ct" !! child !}{% end %}
 {% end %}]])
-    local s = render_str('{( "/fake/templ.ct" )}',
+    local s = render_str('{! "/fake/templ.ct" !}',
       {name = "one", child = {name = "two", child = {name = "three"} } })
     assert.equal('Hello one!\n  Hello two!\n    Hello three!', s)
   end)
 
   it('supports comments', function()
-    local s = render_str([[Hel{# this is a multi-line
-        comment #}lo {{name}}!]], { name = "world" })
+    local s = render_str([[Hel{? this is a multi-line
+        comment ?}lo {:name:}!]], { name = "world" })
     assert.equal('Hello world!', s)
   end)
 
   it('loads templates by absolute filename', function()
-    template.set_env(_G)
     local s = render_file(config.LIFT_SRC_DIR..'/../spec/files/templates/row.lua',
       {k = 'pi', v = 3.14})
     assert.equal("pi = 3.14", s)
@@ -80,7 +78,7 @@ pi = 3.1415
     assert.error_match(function() render_file('non_existing.lua') end,
       "cannot find template 'non_existing.lua'")
     assert.error_match(function() render_file('templates/sub/invalid.lua') end,
-      "invalid.lua:2:")
+      "invalid.lua:8")
   end)
 
 end)

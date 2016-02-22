@@ -1,5 +1,5 @@
 -- Task 'default' downloads two files concurrently
--- Task 'clean' deletes the two downloaded files
+-- Task 'clean' deletes the downloaded files
 
 local fs = require 'lift.fs'
 local task = require 'lift.task'
@@ -13,7 +13,7 @@ local function download(file_url)
   return filename
 end
 
-function task.greet() -- executed once, despite being called multiple times
+function task.greet() -- executed once, despite multiple calls
   print('Hello '..(config.USER or 'unknown')..'!')
 end
 
