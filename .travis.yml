@@ -34,6 +34,12 @@ before_script:
 script:
   - LUA_INIT="require'luacov'" busted -v
   - luarocks make lift-scm-0.rockspec
+  - cd $CI_HOME/examples/tasks && lift
+  - cd $CI_HOME/examples/downloads && lift
+  - cd $CI_HOME/examples/lua-logo && lift
+  - cd $CI_HOME/examples/build-lua && lift
+  - cd $CI_HOME/examples/count-cmd && lift count lua $CI_HOME
+  - cd $CI_HOME
 
 after_success:
   - luacov-coveralls -v

@@ -113,7 +113,7 @@ function task.doc()
   local v = task.get_doc_vars()
   -- create or clean the output dir
   if fs.access(v.output_dir) then
-    los.sh('rm -Rf '..v.output_dir..'/*')
+    los.sh('rm -Rf '..v.output_dir..'/.git '..v.output_dir..'/*')
   else
     fs.mkdir(v.output_dir)
   end
@@ -164,6 +164,14 @@ function task.doc()
     page_tpl(function(s) f:write(s) end, v)
     f:close()
   end
+end
+
+function task.doc_publish()
+  task.doc()
+  local v = task.get_doc_vars()
+  los.sh('cd '..v.output_dir..' && git init && git add . && '..
+    'git commit -m "Deploy to GitHub Pages" && '..
+    'git push --force git@github.com:tbastos/lift.run.git master:gh-pages')
 end
 
 ------------------------------------------------------------------------------

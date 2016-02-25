@@ -63,13 +63,17 @@ task.default = task.get_ready
 - Text templating engine with support for embedded Lua, partials and indentation.
 - Modular, extensible architecture with plugins.
 
+[libuv]: http://libuv.org/
+[LPeg]: http://www.inf.puc-rio.br/~roberto/lpeg/
+
 ## Why did you write Lift?
 
-I wrote Lift for a few reasons. First, Lua lacked a general-purpose build/automation tool similar to Ruby's Rake, or JavaScript's Jake/Grunt/Gulp. If I needed to automate anything in my C/C++/Lua projects I would have to resort to non-portable shell scripts, or depend on yet another toolchain such as `npm`. Since Lua itself lacks batteries, it was never a convenient language to write portable tools in. Lift comes to solve these problems by being both an automation tool and a tool framework.
+First, because Lua always lacked a general-purpose build/automation tool similar to Ruby's Rake/Thor, or JavaScript's Grunt/Gulp. If I needed to automate something in my C++/Lua projects I would have to resort to non-portable shell scripts, or depend on yet another language toolchain.
 
-Lua is actually an excellent language for tools. It's easy to pick up, has features such as coroutines and metamethods (which JavaScript lacks), and its small size means it's much easier to deploy than other scripting languages. Lift provides unique value as a small, extensible framework for tools. It's _not_ specialized for one class of applications (such as building native vs. web applications), and almost any use case can be covered by leveraging plugins.
+Second, because Lua is an excellent language for automation scripts. It's easy to pick up, supports coroutines, closures and metamethods, and its small size means it's much easier to deploy than other scripting languages. Lua-based tools can achieve exceptional levels of efficiency and portability. However, since Lua comes "without batteries", it was never an easy language to write tools in.
 
-Personally, I'm using Lift to write a C/C++ dev tool. And also to generate this website.
+As a standalone tool and framework, Lift intends to solve both these problems.
+I'm personally using it (as a framework) to write a development tool for C/C++, and also (as a tool) to generate this website.
 
-In the future Lift will be available as an easy-to-deploy standalone executable that does not depend on LuaRocks, so that you can use it to bootstrap your development environment from scratch.
+In the future Lift will be available as an easy-to-deploy standalone executable independent of LuaRocks, so that you can use it to bootstrap your development environment from scratch.
 
