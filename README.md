@@ -4,8 +4,6 @@
 
 Lift is both a general-purpose **task automation tool** and a **framework for command-line tools** in Lua. It’s well suited for creating build scripts, checkers, code generators, package managers and other kinds of command-line productivity tools.
 
-#### Please check out <http://lift.run> to learn more!
-
 ## Contributing
 
 Anyone can help make this project better – follow our [contribution guidelines](CONTRIBUTING.md) and check out the [project's philosophy](CONTRIBUTING.md#philosophy).
